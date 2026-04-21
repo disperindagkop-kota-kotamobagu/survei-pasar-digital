@@ -352,7 +352,7 @@ export default function SurveyPage() {
         is_geofence_valid: geofenceStatus === 'valid',
         ocr_amount_detect: ocrAmount ? parseFloat(ocrAmount) : null,
         created_at: new Date().toISOString(),
-        synced: false,
+        synced: 0,
       };
 
       if (editId) {
