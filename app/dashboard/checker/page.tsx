@@ -146,19 +146,35 @@ export default function CheckerPage() {
 
   return (
     <>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Verifikasi Data</h1>
-          <p className="page-subtitle">Validasi dan setujui laporan survei pasar harian</p>
-        </div>
-        {counts.pending > 0 && (
-          <div className="pulse-container">
-             <div className="pulse-badge">
-                <span className="pulse-dot" />
-                {counts.pending} Perlu Verifikasi
-             </div>
+      <div className="sticky-dashboard-header">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Verifikasi Data</h1>
+            <p className="page-subtitle">Validasi dan setujui laporan survei pasar harian</p>
           </div>
-        )}
+          {counts.pending > 0 && (
+            <div className="pulse-container">
+               <div className="pulse-badge">
+                  <span className="pulse-dot" />
+                  {counts.pending} Perlu Verifikasi
+               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Filter Navigation - Now inside sticky header */}
+        <div className="filter-nav" style={{ marginTop: 12, borderBottom: 'none' }}>
+          {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`filter-tab ${filter === f ? 'active' : ''}`}
+            >
+              {f === 'all' ? 'Semua' : f === 'pending' ? 'Menunggu' : f === 'approved' ? 'Disetujui' : 'Ditolak'}
+              <span className="count-tag">{counts[f]}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {toast && (
@@ -194,18 +210,28 @@ export default function CheckerPage() {
           </div>
         </div>
 
-        {/* Filter Navigation */}
-        <div className="filter-nav mb-6">
-          {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`filter-tab ${filter === f ? 'active' : ''}`}
+        {/* Auto Approve Area - Styled to fit fixed layout */}
+        <div className="card mb-6" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.08))', border: '1px solid var(--primary-light)', padding: '16px 20px', borderRadius: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                <Zap size={18} fill="white" />
+              </div>
+              <div style={{ lineHeight: 1.2 }}>
+                <p style={{ fontWeight: 700, fontSize: 14 }}>Verifikasi Otomatis</p>
+                <p className="text-xs text-muted" style={{ marginTop: 2 }}>{autoApprovableCount} data memenuhi kriteria otomatis.</p>
+              </div>
+            </div>
+            <button 
+              className="btn btn-primary btn-sm" 
+              onClick={handleAutoApprove}
+              disabled={processing === 'auto' || autoApprovableCount === 0}
+              style={{ background: autoApprovableCount > 0 ? 'var(--primary)' : 'var(--border)', padding: '8px 16px' }}
             >
-              {f === 'all' ? 'Semua Data' : f === 'pending' ? 'Menunggu' : f === 'approved' ? 'Disetujui' : 'Ditolak'}
-              <span className="count-tag">{counts[f]}</span>
+              {processing === 'auto' ? <span className="spinner-mini" /> : <Check size={14} strokeWidth={3} style={{ marginRight: 6 }} />}
+              Setujui {autoApprovableCount} Data
             </button>
-          ))}
+          </div>
         </div>
 
         {/* Submissions List */}
@@ -307,6 +333,21 @@ export default function CheckerPage() {
       )}
 
       <style jsx>{`
+        .sticky-dashboard-header {
+          position: sticky;
+          top: 0;
+          z-index: 50;
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(10px);
+          margin: -24px -24px 24px -24px;
+          padding: 24px 24px 0 24px;
+          border-bottom: 1px solid var(--border);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+        }
+        :global(.dark) .sticky-dashboard-header {
+          background: rgba(15, 23, 42, 0.9);
+        }
+        
         .pulse-container {
           display: flex;
           align-items: center;
