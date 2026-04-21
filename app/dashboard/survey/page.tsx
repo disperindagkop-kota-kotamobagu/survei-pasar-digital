@@ -121,6 +121,13 @@ export default function SurveyPage() {
     }
   }, [selectedMarket]);
 
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processPhoto(file);
+    e.target.value = '';
+  }, [processPhoto]);
+
   // =========================================
   // KAMERA
   // =========================================
