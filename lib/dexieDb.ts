@@ -50,10 +50,10 @@ export async function updatePendingSubmission(id: number, data: Partial<PendingS
 
 // Get all unsynced submissions
 export async function getPendingSubmissions(): Promise<PendingSubmission[]> {
-  // Support both 0 (new numeric format) and false (legacy boolean format)
+  // Gunakan filter koleksi agar aman dari error tipe data (boolean vs number) di IndexedDB
   return db.pendingSubmissions
-    .where('synced')
-    .anyOf([0, false as any])
+    .toCollection()
+    .filter(item => !item.synced || item.synced === 0)
     .toArray();
 }
 
