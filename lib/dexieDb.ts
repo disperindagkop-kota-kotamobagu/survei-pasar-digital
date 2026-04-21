@@ -15,7 +15,7 @@ export interface PendingSubmission {
   is_geofence_valid: boolean;
   ocr_amount_detect: number | null;
   created_at: string;
-  synced: boolean;
+  synced: number; // 0 for no, 1 for yes
   location_type?: 'toko' | 'ruko' | 'lapak' | 'perorangan';
 }
 
@@ -40,7 +40,7 @@ export const db = new SurveyorDB();
 
 // Add new pending submission
 export async function addPendingSubmission(data: Omit<PendingSubmission, 'id'>): Promise<number> {
-  return db.pendingSubmissions.add({ ...data, synced: false });
+  return db.pendingSubmissions.add({ ...data, synced: 0 });
 }
 
 // Update existing pending submission
@@ -50,12 +50,16 @@ export async function updatePendingSubmission(id: number, data: Partial<PendingS
 
 // Get all unsynced submissions
 export async function getPendingSubmissions(): Promise<PendingSubmission[]> {
-  return db.pendingSubmissions.where('synced').equals(0).toArray();
+  // Support both 0 (new numeric format) and false (legacy boolean format)
+  return db.pendingSubmissions
+    .where('synced')
+    .anyOf([0, false as any])
+    .toArray();
 }
 
 // Mark as synced (only after 200 OK from Supabase)
 export async function markAsSynced(id: number): Promise<void> {
-  await db.pendingSubmissions.update(id, { synced: true });
+  await db.pendingSubmissions.update(id, { synced: 1 });
 }
 
 // Count pending
