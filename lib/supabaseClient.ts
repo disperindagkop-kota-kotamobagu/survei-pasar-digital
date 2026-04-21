@@ -34,6 +34,8 @@ export interface Submission {
   ocr_amount_detect?: number;
   created_at: string;
   notes?: string;
+  location_type?: string;
+  drive_link?: string;
   surveyor_name?: string;
   market_name?: string;
 }
