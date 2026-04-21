@@ -212,12 +212,20 @@ export default function AdminPage() {
     setCleaning(true);
     setSyncProgress('Inisialisasi...');
     try {
-      // 1. Sync ke Google (untuk data yang belum punya drive_link)
-      const toSync = submissions.filter(s => s.status === 'approved' && !s.drive_link);
+      // 1. Sync ke Google (untuk data yang belum punya drive_link yang valid)
+      // Kita anggap link di bawah 10 karakter sebagai tidak valid/kosong
+      const toSync = submissions.filter(s => 
+        s.status === 'approved' && 
+        (!s.drive_link || s.drive_link.trim().length < 10)
+      );
       
+      console.log('Data yang ditemukan untuk sinkron:', toSync);
+
       if (toSync.length === 0) {
+        alert('Semua data Approved terdeteksi sudah sinkron atau tidak ada data baru.');
         setSyncProgress('Sudah sinkron.');
       } else {
+        alert(`Ditemukan ${toSync.length} data Approved yang belum sinkron ke Google. Memulai proses...`);
         for (let i = 0; i < toSync.length; i++) {
           const sub = toSync[i];
           setSyncProgress(`Memproses ${i + 1}/${toSync.length}: ${sub.market_name}...`);
