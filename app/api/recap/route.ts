@@ -124,7 +124,16 @@ export async function POST(req: NextRequest) {
       [fullDate, surveyor_name, market_name, body.location_type || 'Lapak', amount, finalPhotoLink, notes || '-']
     ];
 
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    let rawSheetId = (process.env.GOOGLE_SHEET_ID || '').trim();
+    // SMART EXTRACTOR for Sheets
+    if (rawSheetId.includes('http')) {
+      const sheetMatch = rawSheetId.match(/\/d\/([a-zA-Z0-9-_]+)/) || rawSheetId.match(/id=([a-zA-Z0-9-_]+)/);
+      if (sheetMatch && sheetMatch[1]) {
+        rawSheetId = sheetMatch[1];
+      }
+    }
+    const spreadsheetId = rawSheetId;
+    const maskedSheetId = spreadsheetId ? `${spreadsheetId.slice(0, 4)}...${spreadsheetId.slice(-4)}` : 'TIDAK_ADA';
     
     // Helper to append and ensure tab
     const appendToSheet = async (title: string) => {
@@ -137,7 +146,7 @@ export async function POST(req: NextRequest) {
           requestBody: { values },
         });
       } catch (err: any) {
-        if (err.message.includes('not found')) {
+        if (err.message.includes('not found') && !err.message.includes('Requested entity was not found')) {
           // Create Sheet
           await sheets.spreadsheets.batchUpdate({
             spreadsheetId,
@@ -159,25 +168,37 @@ export async function POST(req: NextRequest) {
             valueInputOption: 'USER_ENTERED',
             requestBody: { values },
           });
+        } else {
+          throw err;
         }
       }
     };
 
-    // Calculate Week String (Monday Start)
-    const weekStart = new Date(now);
-    const day = weekStart.getDay() || 7; // Sunday=7
-    weekStart.setDate(weekStart.getDate() - day + 1);
-    const weekLabel = `Minggu-${weekStart.toISOString().slice(5, 10)}`;
-    const monthLabel = `Bulan-${now.toISOString().slice(0, 7)}`;
+    try {
+      // Calculate Week String (Monday Start)
+      const weekStart = new Date(now);
+      const day = weekStart.getDay() || 7; // Sunday=7
+      weekStart.setDate(weekStart.getDate() - day + 1);
+      const weekLabel = `Minggu-${weekStart.toISOString().slice(5, 10)}`;
+      const monthLabel = `Bulan-${now.toISOString().slice(0, 7)}`;
 
-    await Promise.all([
-      appendToSheet('Master'),
-      appendToSheet(`Harian-${dateStrOnly}`),
-      appendToSheet(`Mingguan-${weekLabel}`),
-      appendToSheet(`Bulanan-${monthLabel}`)
-    ]);
+      await Promise.all([
+        appendToSheet('Master'),
+        appendToSheet(`Harian-${dateStrOnly}`),
+        appendToSheet(`Mingguan-${weekLabel}`),
+        appendToSheet(`Bulanan-${monthLabel}`)
+      ]);
+    } catch (sheetErr: any) {
+      return NextResponse.json({ 
+        success: false, 
+        error: `Gagal menulis ke Sheets: ${sheetErr.message}`, 
+        phase: 'SHEETS_APPEND', 
+        serviceEmail,
+        sheetId: maskedSheetId
+      }, { status: 500 });
+    }
 
-    return NextResponse.json({ success: true, driveLink: finalPhotoLink, serviceEmail });
+    return NextResponse.json({ success: true, driveLink: finalPhotoLink, serviceEmail, sheetId: maskedSheetId });
   } catch (error: any) {
     console.error('API Error:', error);
     // Kembalikan pesan error asli agar bisa didiagnosa di dashboard

@@ -199,9 +199,9 @@ export default function AdminPage() {
 
       const result = await res.json();
       if (result.success) {
-        alert(`✅ KONEKSI & UPLOAD FOTO BERHASIL!\n\nRobot: ${result.serviceEmail}\nFolder Terdeteksi: ${result.folderId || 'Utama'}\nData test sudah masuk ke Drive & Sheets.`);
+        alert(`✅ SEMUA KONEKSI BERHASIL!\n\nRobot: ${result.serviceEmail}\nFolder: ${result.folderId}\nSheet: ${result.sheetId}\n\nData test sudah masuk ke Drive & Sheets.`);
       } else {
-        alert(`❌ KONEKSI GAGAL!\nFase: ${result.phase}\nError: ${result.error}\n\nRobot: ${result.serviceEmail || 'Tidak Terdeteksi'}\nFolder: ${result.folderId || 'Tidak Terdeteksi'}\n\nSaran: Pastikan Robot di atas sudah menjadi EDITOR di Folder tersebut.`);
+        alert(`❌ KONEKSI GAGAL!\nFase: ${result.phase}\nError: ${result.error}\n\nRobot: ${result.serviceEmail || 'Tidak Terdeteksi'}\nSheet ID: ${result.sheetId || 'Tidak Terdeteksi'}\n\nSaran: Pastikan Robot di atas sudah menjadi EDITOR di file Google Sheets tersebut.`);
       }
     } catch (err: any) {
       alert('❌ ERROR SISTEM: ' + err.message);
@@ -242,7 +242,7 @@ export default function AdminPage() {
           const resData = await recapRes.json();
           if (!recapRes.ok) {
             setSyncLogs(prev => [...prev, `[ERROR] Gagal pada Fase ${resData.phase || 'UNKNOWN'}: ${resData.error}`]);
-            setSyncLogs(prev => [...prev, `[TIP] Pastikan email ${resData.serviceEmail} sudah jadi Editor di Drive.`]);
+            setSyncLogs(prev => [...prev, `[TIP] Pastikan email ${resData.serviceEmail} sudah jadi Editor di Drive & SHEETS (ID: ${resData.sheetId}).`]);
             throw new Error(`Data ${i + 1} gagal: ${resData.error}`);
           }
           setSyncLogs(prev => [...prev, `[SUCCESS] Data ${i + 1} terkirim ke Drive & Sheets.`]);
