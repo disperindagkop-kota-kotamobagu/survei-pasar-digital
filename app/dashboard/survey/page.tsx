@@ -121,12 +121,7 @@ export default function SurveyPage() {
     }
   }, [selectedMarket]);
 
-  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await processPhoto(file);
-    e.target.value = '';
-  }, [processPhoto]);
+
 
   // =========================================
   // KAMERA
@@ -189,6 +184,13 @@ export default function SurveyPage() {
       console.error('Error processing photo:', err);
     }
   }, []);
+
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processPhoto(file);
+    e.target.value = '';
+  }, [processPhoto]);
 
   // Helper to convert dataUrl to grayscale for better OCR
   const preprocessImage = async (dataUrl: string): Promise<string> => {
