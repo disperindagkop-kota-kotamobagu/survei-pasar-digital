@@ -138,8 +138,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, driveLink: finalPhotoLink });
   } catch (error: any) {
-    console.error('API Error:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('API Error:', error);
+    // Kembalikan pesan error asli agar bisa didiagnosa di dashboard
+    const errorMsg = error.response?.data?.error_description || error.message || 'Unknown Error';
+    return NextResponse.json({ 
+      success: false, 
+      error: errorMsg,
+      details: error.response?.data || error.stack
+    }, { status: 500 });
   }
 }
 

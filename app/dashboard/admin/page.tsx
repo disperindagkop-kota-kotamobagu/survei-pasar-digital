@@ -9,6 +9,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [cleaning, setCleaning] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'markets'>('overview');
   const [timeFilter, setTimeFilter] = useState<'day' | 'week' | 'month' | 'all'>('all');
 
@@ -172,6 +173,38 @@ export default function AdminPage() {
     setExporting(false);
   };
 
+  const handleDiagnostic = async () => {
+    setDiagnosing(true);
+    try {
+      const { supabase } = await import('@/lib/supabaseClient');
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const res = await fetch('/api/recap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'test-diag-' + Date.now(),
+          amount: 0,
+          market_name: 'TEST_DIAGNOSTIK',
+          surveyor_name: user?.email || 'Admin-Test',
+          location_type: 'tes',
+          created_at: new Date().toISOString(),
+          notes: 'Testing connection from dashboard'
+        }),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        alert('✅ KONEKSI BERHASIL!\nData test sudah masuk ke Google Drive & Sheets (Tab Master).');
+      } else {
+        alert('❌ KONEKSI GAGAL!\nError: ' + (result.error || 'Unknown Error') + '\n\nDetail: ' + JSON.stringify(result.details || {}));
+      }
+    } catch (err: any) {
+      alert('❌ ERROR SISTEM: ' + err.message);
+    }
+    setDiagnosing(false);
+  };
+
   const handleManualSyncAndCleanup = async () => {
     if (!confirm('Apakah Anda ingin menyinkronkan data Approved ke Google Drive dan menghapus foto di Supabase untuk menghemat ruang?')) return;
     
@@ -239,6 +272,17 @@ export default function AdminPage() {
             {cleaning
               ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Memproses...</>
               : '🔄 Sync & Bersihkan'
+            }
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={handleDiagnostic}
+            disabled={diagnosing}
+            style={{ borderColor: 'rgba(245,158,11,0.3)', color: '#f59e0b' }}
+          >
+            {diagnosing
+              ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Mengetes...</>
+              : '🛠️ Cek Koneksi Google'
             }
           </button>
         </div>
