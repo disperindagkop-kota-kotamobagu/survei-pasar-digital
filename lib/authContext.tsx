@@ -55,21 +55,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { supabase } = await import('./supabaseClient');
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) return { error: error.message };
+        
+        if (error) {
+          console.error('Supabase Auth Error:', error.message);
+          if (error.message === 'Invalid login credentials') return { error: 'Email atau password salah.' };
+          if (error.message === 'Email not confirmed') return { error: 'Email belum dikonfirmasi. Periksa inbox Anda.' };
+          return { error: error.message };
+        }
+
         if (data.user) {
-          const { data: profile } = await supabase
+          console.log('Auth success, fetching profile for:', data.user.id);
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', data.user.id)
             .single();
+
+          if (profileError) {
+            console.error('Profile fetch error:', profileError);
+            return { error: 'Akun terdaftar tapi profil belum dibuat. Hubungi admin.' };
+          }
+
           if (profile) {
             setUser(profile);
             localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
             return {};
           }
         }
-      } catch (e) {
-        return { error: 'Koneksi ke server gagal.' };
+      } catch (e: any) {
+        console.error('Login Exception:', e);
+        return { error: 'Koneksi ke server gagal: ' + (e.message || 'Unknown error') };
       }
     }
 
