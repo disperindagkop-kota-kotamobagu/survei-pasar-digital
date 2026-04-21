@@ -217,16 +217,18 @@ body::after {
 }
 
 .page-header {
-  padding: 28px 32px 20px;
+  padding: 24px 32px;
+  min-height: 94px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-glass);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px);
   position: sticky;
   top: 0;
   z-index: 50;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 20px;
 }
 
 .page-title {
@@ -812,12 +814,64 @@ tbody tr:hover { background: rgba(99,102,241,0.04); }
 /* =====================================================
    RESPONSIVE
    ===================================================== */
+/* =====================================================
+    MODALS
+    ===================================================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 26, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.3s ease;
+}
+
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
 @media (max-width: 768px) {
   .sidebar { transform: translateX(-100%); width: 280px; }
   .sidebar.open { transform: translateX(0); box-shadow: var(--shadow-lg); }
   .main-content { margin-left: 0; }
   .page-header { padding: 20px 16px; }
-  .page-body { padding: 20px 16px; }
+  .page-body { padding: 20px 16px; min-height: calc(100vh - 94px); }
   .grid-4 { grid-template-columns: 1fr 1fr; }
   .grid-3 { grid-template-columns: 1fr; }
   .grid-2 { grid-template-columns: 1fr; }
