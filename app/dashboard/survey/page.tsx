@@ -68,6 +68,7 @@ export default function SurveyPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
+  const [editingTempId, setEditingTempId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCombinedHistory();
@@ -124,6 +125,7 @@ export default function SurveyPage() {
     setLocationType('lapak');
     setNotes('');
     setEditId(null);
+    setEditingTempId(null);
   };
 
   const handleEdit = (item: any) => {
