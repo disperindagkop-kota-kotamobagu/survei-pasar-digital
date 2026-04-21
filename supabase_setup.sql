@@ -66,7 +66,7 @@ BEGIN
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -115,9 +115,11 @@ CREATE POLICY "Admins have full access to submissions" ON submissions FOR ALL US
 
 -- 8. SEED DATA
 INSERT INTO markets (name, lat, long) VALUES
-('Pasar Sentral KTG', -2.5355, 118.9741),
-('Pasar Malam Kotabaru', -2.5412, 118.9823),
-('Pasar Induk Tanjung', -2.5298, 118.9685),
-('Pasar Tradisional Kelua', -2.5501, 118.9612),
-('Pasar Agribisnis Murung', -2.5187, 118.9798)
-ON CONFLICT (name) DO NOTHING;
+('Pasar 23 Maret', 0.741595984978156, 124.308692430393),
+('Pasar Poyowa Kecil', 0.720813405532594, 124.291921101915),
+('Pasar Genggulang', 0.752935670135016, 124.314290379467),
+('Pasar Jajan', 0.738412515687386, 124.31159795033),
+('Area PUPR', 0.745612444219645, 124.317124179533)
+ON CONFLICT (name) DO UPDATE SET 
+  lat = EXCLUDED.lat,
+  long = EXCLUDED.long;

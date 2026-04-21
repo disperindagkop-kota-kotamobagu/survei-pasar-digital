@@ -21,9 +21,12 @@ export async function syncSubmissions() {
         
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('submissions')
-          .upload(fileName, blob, { contentType: 'image/jpeg' });
+          .upload(fileName, blob, { contentType: 'image/jpeg', upsert: true });
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error('Storage Error:', uploadError);
+          throw new Error(`Gagal Upload Foto: ${uploadError.message}`);
+        }
         
         const { data: publicUrl } = supabase.storage
           .from('submissions')
@@ -52,7 +55,10 @@ export async function syncSubmissions() {
           updated_at: new Date().toISOString()
         });
 
-      if (upsertError) throw upsertError;
+      if (upsertError) {
+        console.error('Database Error:', upsertError);
+        throw new Error(`Gagal Simpan Database: ${upsertError.message}`);
+      }
 
       // 3. Update status di local DB
       if (item.id) await markAsSynced(item.id);
