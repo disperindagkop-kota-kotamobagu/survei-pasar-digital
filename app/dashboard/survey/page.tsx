@@ -57,6 +57,7 @@ export default function SurveyPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Form
+  const [amount, setAmount] = useState('');
   const [locationType, setLocationType] = useState<'toko' | 'ruko' | 'lapak' | 'perorangan'>('lapak');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
