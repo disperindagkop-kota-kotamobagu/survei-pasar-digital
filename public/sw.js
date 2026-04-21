@@ -14,6 +14,13 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // Hanya cache permintaan GET dan bukan ke API/Supabase
+  const isApiRequest = event.request.url.includes('/api/') || event.request.url.includes('supabase.co');
+  
+  if (event.request.method !== 'GET' || isApiRequest) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(response => {
