@@ -10,6 +10,7 @@ export default function AdminPage() {
   const [exporting, setExporting] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'markets'>('overview');
   const [timeFilter, setTimeFilter] = useState<'day' | 'week' | 'month' | 'all'>('all');
 
@@ -203,35 +204,49 @@ export default function AdminPage() {
       alert('❌ ERROR SISTEM: ' + err.message);
     }
     setDiagnosing(false);
-  };
-
-  const handleManualSyncAndCleanup = async () => {
+   const handleManualSyncAndCleanup = async () => {
     if (!confirm('Apakah Anda ingin menyinkronkan data Approved ke Google Drive dan menghapus foto di Supabase untuk menghemat ruang?')) return;
     
     setCleaning(true);
+    setSyncProgress('Inisialisasi...');
     try {
       // 1. Sync ke Google (untuk data yang belum punya drive_link)
       const toSync = submissions.filter(s => s.status === 'approved' && !s.drive_link);
-      console.log(`Menyinkronkan ${toSync.length} data ke Google...`);
       
-      for (const sub of toSync) {
-        await fetch('/api/recap', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sub),
-        });
+      if (toSync.length === 0) {
+        setSyncProgress('Sudah sinkron.');
+      } else {
+        for (let i = 0; i < toSync.length; i++) {
+          const sub = toSync[i];
+          setSyncProgress(`Memproses ${i + 1}/${toSync.length}: ${sub.market_name}...`);
+          
+          const recapRes = await fetch('/api/recap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sub),
+          });
+
+          if (!recapRes.ok) {
+            const errorData = await recapRes.json();
+            throw new Error(`Gagal kirim data ${i + 1}: ${errorData.error || 'Unknown Error'}`);
+          }
+        }
       }
 
       // 2. Jalankan Cleanup
+      setSyncProgress('Membersihkan Supabase...');
       const res = await fetch('/api/cleanup');
       const cleanupResult = await res.json();
       
       alert(cleanupResult.message || 'Pembersihan selesai!');
       fetchData(); // Refresh UI
     } catch (err: any) {
-      alert('Terjadi kesalahan saat pembersihan: ' + err.message);
+      alert('TERHENTI: ' + err.message);
     }
     setCleaning(false);
+    setSyncProgress('');
+  };
+
   };
 
   return (
@@ -270,7 +285,7 @@ export default function AdminPage() {
             style={{ borderColor: 'rgba(16,185,129,0.3)', color: '#10b981' }}
           >
             {cleaning
-              ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Memproses...</>
+              ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> {syncProgress}</>
               : '🔄 Sync & Bersihkan'
             }
           </button>
