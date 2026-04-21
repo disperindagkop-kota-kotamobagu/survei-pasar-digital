@@ -219,10 +219,10 @@ export default function AdminPage() {
     try {
       const toSync = submissions.filter(s => 
         s.status === 'approved' && 
-        (!s.drive_link || s.drive_link.trim().length < 10)
+        (!s.drive_link || s.drive_link === '-' || !s.drive_link.startsWith('http'))
       );
       
-      setSyncLogs(prev => [...prev, `[INFO] Ditemukan ${toSync.length} data Approved.`]);
+      setSyncLogs(prev => [...prev, `[INFO] Ditemukan ${toSync.length} data Approved (termasuk yang gagal sebelumnya).`]);
 
       if (toSync.length === 0) {
         setSyncProgress('Sudah sinkron.');
