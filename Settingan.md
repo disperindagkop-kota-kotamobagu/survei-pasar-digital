@@ -39,5 +39,14 @@ Saat melakukan deploy ke Vercel agar bisa digunakan di HP, masukkan variabel ber
 5. `GOOGLE_SHEET_ID`
 6. `GOOGLE_DRIVE_FOLDER_ID`
 
+## 5. Fitur Baru: Otomasi & Validasi
+Aplikasi sekarang dilengkapi dengan fitur validasi otomatis:
+- **Geofence Validation**: Menyimpan status apakah surveyor berada di lokasi pasar saat input.
+- **OCR Amount Detection**: Membaca nominal dari foto secara otomatis untuk dibandingkan dengan input surveyor.
+- **Auto-Approval**: Checker dapat menyetujui data secara massal jika GPS Valid dan OCR Cocok.
+
+> [!IMPORTANT]
+> **Update Database**: Jika Anda sudah memiliki tabel `submissions`, pastikan Anda telah menjalankan perintah `ALTER TABLE` atau menjalankan ulang file `supabase_setup.sql` untuk menambahkan kolom `is_geofence_valid` dan `ocr_amount_detect`.
+
 ---
-*Dokumen ini dibuat otomatis pada 21 April 2026 sebagai panduan administrasi.*
+*Dokumen ini diperbarui pada 21 April 2026 dengan fitur Otomasi & Validasi.*

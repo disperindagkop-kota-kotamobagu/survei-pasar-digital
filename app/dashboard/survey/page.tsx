@@ -18,10 +18,27 @@ interface LocationData {
 
 export default function SurveyPage() {
   const { user } = useAuth();
+  const [markets, setMarkets] = useState<any[]>([]);
   const [selectedMarket, setSelectedMarket] = useState('');
   const [geofenceStatus, setGeofenceStatus] = useState<GeofenceStatus>('idle');
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [geofenceMsg, setGeofenceMsg] = useState('');
+
+  useEffect(() => {
+    fetchMarkets();
+  }, []);
+
+  const fetchMarkets = async () => {
+    try {
+      const { supabase } = await import('@/lib/supabaseClient');
+      const { data, error } = await supabase.from('markets').select('*').order('name');
+      if (error) throw error;
+      setMarkets(data || []);
+    } catch (e) {
+      console.error('Error fetching markets:', e);
+      setMarkets(DEMO_MARKETS);
+    }
+  };
 
   // Photo & OCR
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
@@ -103,7 +120,7 @@ export default function SurveyPage() {
     setGeofenceMsg('Mengambil lokasi GPS Anda...');
     try {
       const coords = await getUserLocation();
-      const market = DEMO_MARKETS.find(m => m.id === selectedMarket);
+      const market = markets.find(m => m.id === selectedMarket);
       if (!market) return;
       const dist = haversineDistance(coords.latitude, coords.longitude, market.lat, market.long);
       const distM = Math.round(dist * 1000);
@@ -284,7 +301,7 @@ export default function SurveyPage() {
     setSaveResult(null);
     try {
       const { addPendingSubmission, updatePendingSubmission } = await import('@/lib/dexieDb');
-      const market = DEMO_MARKETS.find(m => m.id === selectedMarket);
+      const market = markets.find(m => m.id === selectedMarket);
       
       const payload = {
         tempId: editingTempId || crypto.randomUUID(),
@@ -323,7 +340,7 @@ export default function SurveyPage() {
     return () => { if (cameraStream) cameraStream.getTracks().forEach(t => t.stop()); };
   }, [cameraStream]);
 
-  const market = DEMO_MARKETS.find(m => m.id === selectedMarket);
+  const market = markets.find(m => m.id === selectedMarket);
   const canSubmit = selectedMarket && amount && photoPreview;
 
   return (
@@ -371,7 +388,7 @@ export default function SurveyPage() {
                     required
                   >
                     <option value="">-- Pilih pasar --</option>
-                    {DEMO_MARKETS.map(m => (
+                    {markets.map(m => (
                       <option key={m.id} value={m.id}>{m.name}</option>
                     ))}
                   </select>
