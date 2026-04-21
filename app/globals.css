@@ -678,35 +678,33 @@ tbody tr:hover { background: rgba(99,102,241,0.04); }
    MOBILE MENU TOGGLE
    ===================================================== */
 .mobile-menu-btn {
-  display: none;
+  display: flex;
   position: fixed;
-  top: 50%;
-  left: -4px; /* Setengah timbul */
-  transform: translateY(-50%);
-  width: 44px;
-  height: 64px;
-  border-radius: 0 20px 20px 0;
+  top: 16px;
+  left: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   background: var(--primary);
   background: linear-gradient(135deg, var(--primary), var(--secondary));
-  box-shadow: 4px 0 15px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-left: none;
   cursor: pointer;
   z-index: 200;
   align-items: center;
-  justify-content: flex-end;
-  padding-right: 8px;
+  justify-content: center;
   color: white;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .mobile-menu-btn:hover {
-  left: 0;
-  width: 50px;
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
 }
 
 .mobile-menu-btn.sidebar-open {
-  left: -60px; /* Sembunyikan saat sidebar terbuka */
+  transform: translateX(-60px); /* Sembunyikan saat sidebar terbuka */
+  opacity: 0;
 }
 
 /* =====================================================

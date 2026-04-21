@@ -362,6 +362,13 @@ export default function SurveyPage() {
       
       clearForm();
       fetchCombinedHistory();
+      
+      // Trigger sync immediately if online
+      if (navigator.onLine) {
+        import('@/lib/syncService').then(({ syncSubmissions }) => {
+          syncSubmissions().then(() => fetchCombinedHistory());
+        });
+      }
     } catch (err) {
       console.error('Save error:', err);
       setSaveResult({ type: 'error', msg: 'Gagal menyimpan data ke database lokal.' });
@@ -780,10 +787,25 @@ export default function SurveyPage() {
               <h2 style={{ fontSize: 20, fontWeight: 800 }}>Riwayat Survei</h2>
               <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Status sinkronisasi & verifikasi real-time</p>
             </div>
-            <button className="btn btn-secondary btn-sm" onClick={fetchCombinedHistory} disabled={loadingHistory}>
-              {loadingHistory ? <span className="spinner" style={{ width: 14, height: 14 }} /> : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>}
-              Perbarui
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button 
+                className="btn btn-primary btn-sm" 
+                onClick={async () => {
+                   setLoadingHistory(true);
+                   const { syncSubmissions } = await import('@/lib/syncService');
+                   await syncSubmissions();
+                   await fetchCombinedHistory();
+                }}
+                disabled={loadingHistory}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2v6h-6M3 22v-6h6"/><path d="M21 13a9 9 0 11-3-7.7L21 8"/></svg>
+                Sinkron Data
+              </button>
+              <button className="btn btn-secondary btn-sm" onClick={fetchCombinedHistory} disabled={loadingHistory}>
+                {loadingHistory ? <span className="spinner" style={{ width: 14, height: 14 }} /> : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>}
+                Refresh
+              </button>
+            </div>
           </div>
 
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

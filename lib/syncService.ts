@@ -40,6 +40,7 @@ export async function syncSubmissions() {
           surveyor_id: item.surveyor_id,
           market_id: item.market_id,
           amount: item.amount,
+          location_type: item.location_type || 'lapak',
           photo_url: photoUrl || undefined, // jangan timpa jika sudah ada dan edit tidak kirim foto
           notes: item.notes,
           location_lat: item.lat,
