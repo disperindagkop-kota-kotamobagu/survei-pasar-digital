@@ -6,16 +6,22 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { email, password, full_name, role } = body;
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!, // This is the secret key
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Konfigurasi server tidak lengkap: SUPABASE_SERVICE_ROLE_KEY belum terpasang di Vercel.' 
+      }, { status: 500 });
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
       }
-    );
+    });
 
     // 1. Create User in Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({

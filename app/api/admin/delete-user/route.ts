@@ -5,16 +5,22 @@ export async function POST(req: NextRequest) {
   try {
     const { id } = await req.json();
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Konfigurasi server tidak lengkap: SUPABASE_SERVICE_ROLE_KEY belum terpasang di Vercel.' 
+      }, { status: 500 });
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
       }
-    );
+    });
 
     // 1. Delete from Auth (this usually triggers profile deletion if CASCADE is on, 
     // but we can manually handle profiles if needed)
