@@ -76,10 +76,25 @@ export default function MarketsPage() {
     e.preventDefault();
     setProcessing(true);
 
+    const latVal = parseFloat(formData.lat);
+    const longVal = parseFloat(formData.long);
+
+    if (!formData.name.trim()) {
+      showToast('danger', 'Nama pasar harus diisi.');
+      setProcessing(false);
+      return;
+    }
+
+    if (isNaN(latVal) || isNaN(longVal)) {
+      showToast('danger', 'Koordinat lat/long tidak valid.');
+      setProcessing(false);
+      return;
+    }
+
     const payload = {
-      name: formData.name,
-      lat: parseFloat(formData.lat),
-      long: parseFloat(formData.long),
+      name: formData.name.trim(),
+      lat: latVal,
+      long: longVal,
     };
 
     try {
@@ -94,13 +109,16 @@ export default function MarketsPage() {
         const { error } = await supabase
           .from('markets')
           .insert([payload]);
-        if (error) throw error;
+        if (error) {
+          if (error.code === '23505') throw new Error('Nama pasar sudah ada.');
+          throw error;
+        }
         showToast('success', 'Pasar berhasil ditambahkan.');
       }
       fetchMarkets();
       closeModal();
     } catch (err: any) {
-      showToast('danger', 'Gagal menyimpan data: ' + err.message);
+      showToast('danger', 'Gagal menyimpan: ' + (err.message || 'Error tidak diketahui'));
     } finally {
       setProcessing(false);
     }

@@ -145,7 +145,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <main className="main-content">
+      <main className="main-content" style={{ overflowX: 'hidden' }}>
         {children}
       </main>
 

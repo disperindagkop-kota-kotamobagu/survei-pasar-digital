@@ -337,15 +337,12 @@ export default function CheckerPage() {
           position: sticky;
           top: 0;
           z-index: 50;
-          background: rgba(255, 255, 255, 0.9);
-          backdrop-filter: blur(10px);
-          margin: -24px -24px 24px -24px;
-          padding: 24px 24px 0 24px;
-          border-bottom: 1px solid var(--border);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.02);
-        }
-        :global(.dark) .sticky-dashboard-header {
-          background: rgba(15, 23, 42, 0.9);
+          background: var(--bg-glass);
+          backdrop-filter: blur(12px);
+          margin: 0 0 24px 0;
+          padding: 12px 0 0 0;
+          border-bottom: 2px solid var(--primary-light);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         }
         
         .pulse-container {
