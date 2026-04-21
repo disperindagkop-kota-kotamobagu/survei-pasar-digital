@@ -13,6 +13,9 @@ export async function POST(req: NextRequest) {
       scopes: ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file']
     });
 
+    const drive = google.drive({ version: 'v3', auth });
+    const sheets = google.sheets({ version: 'v4', auth });
+
     // 1.5. Dynamic Folder Management (Hierarchical: Market > Type > Date)
     let marketFolderId = '';
     let typeFolderId = '';
