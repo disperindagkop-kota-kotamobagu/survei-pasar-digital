@@ -132,11 +132,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         <div className="sidebar-footer">
           <div className="user-card">
             <div className="user-avatar">
-              {user.full_name.charAt(0).toUpperCase()}
+              {(user.full_name || 'U').charAt(0).toUpperCase()}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p className="user-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.full_name}
+                {user.full_name || 'User'}
               </p>
               <span className="user-role">{user.role}</span>
             </div>
