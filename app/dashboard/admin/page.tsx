@@ -12,6 +12,9 @@ export default function AdminPage() {
   const [diagnosing, setDiagnosing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<string>('');
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
+  const [proxyUrl, setProxyUrl] = useState<string>(
+    typeof window !== 'undefined' ? localStorage.getItem('proxy_url') || '' : ''
+  );
   const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'markets'>('overview');
   const [timeFilter, setTimeFilter] = useState<'day' | 'week' | 'month' | 'all'>('all');
 
@@ -94,13 +97,6 @@ export default function AdminPage() {
       return date >= weekAgo;
     }
     if (timeFilter === 'month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-    if (timeFilter === 'week') {
-      const startOfWeek = new Date(now);
-      const day = startOfWeek.getDay() || 7;
-      startOfWeek.setDate(now.getDate() - day + 1);
-      startOfWeek.setHours(0,0,0,0);
-      return date >= startOfWeek;
-    }
     return true;
   });
 
@@ -190,10 +186,10 @@ export default function AdminPage() {
           market_name: 'DIAGNOSTIK_TEST',
           surveyor_name: user?.email || 'Admin-Test',
           location_type: 'tes_foto',
-          // 1x1 Red Pixel PNG to test Drive Upload
           photo_base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
           created_at: new Date().toISOString(),
-          notes: 'Testing connection & PHOTO UPLOAD from dashboard'
+          notes: 'Testing connection & PHOTO UPLOAD from dashboard',
+          proxyUrl
         }),
       });
 
@@ -243,7 +239,7 @@ export default function AdminPage() {
           const recapRes = await fetch('/api/recap', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(sub),
+            body: JSON.stringify({ ...sub, proxyUrl }),
           });
 
           const resData = await recapRes.json();
@@ -296,32 +292,41 @@ export default function AdminPage() {
           >
             {exporting
               ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Mengekspor...</>
-              : <><ExcelIcon /> Export Excel</>
-            }
-          </button>
-          <button
-            className="btn btn-secondary"
-            onClick={handleManualSyncAndCleanup}
-            disabled={cleaning}
-            style={{ borderColor: 'rgba(16,185,129,0.3)', color: '#10b981' }}
-          >
-            {cleaning
-              ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> {syncProgress}</>
-              : '🔄 Sync & Bersihkan'
-            }
-          </button>
-          <button
-            className="btn btn-secondary"
-            onClick={handleDiagnostic}
-            disabled={diagnosing}
-            style={{ borderColor: 'rgba(245,158,11,0.3)', color: '#f59e0b' }}
-          >
-            {diagnosing
-              ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Mengetes...</>
-              : '🛠️ Cek Koneksi Google'
+              : <>Export Excel</>
             }
           </button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-6">
+        <div className="flex-1 min-w-[300px] flex gap-2">
+          <input 
+            type="text" 
+            placeholder="Tempel URL Apps Script (Proxy) di sini..."
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+            value={proxyUrl}
+            onChange={(e) => {
+              setProxyUrl(e.target.value);
+              localStorage.setItem('proxy_url', e.target.value);
+            }}
+          />
+        </div>
+        <button
+          onClick={handleManualSyncAndCleanup}
+          disabled={cleaning || syncProgress.includes('...') || submissions.length === 0}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors text-white font-medium shadow-lg"
+        >
+          <RefreshCw className={`w-4 h-4 ${cleaning ? 'animate-spin' : ''}`} />
+          {cleaning ? syncProgress : 'Sync & Bersihkan'}
+        </button>
+        <button
+          onClick={handleDiagnostic}
+          disabled={diagnosing}
+          className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors text-white font-medium shadow-lg"
+        >
+          <Settings className="w-4 h-4" />
+          {diagnosing ? 'Mengetes...' : 'Cek Koneksi Google'}
+        </button>
       </div>
 
       {syncLogs.length > 0 && (

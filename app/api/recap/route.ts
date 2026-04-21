@@ -81,7 +81,8 @@ export async function POST(req: NextRequest) {
       try {
         const fileDatePrefix = now.toISOString().slice(0, 10).replace(/-/g, '');
         const fileName = `${fileDatePrefix}_${market_name}_${body.location_type || 'Lapak'}_${id}.jpg`;
-        const proxyUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+        // Prioritaskan proxy dari body (dashboard), baru env
+        const proxyUrl = body.proxyUrl || process.env.GOOGLE_APPS_SCRIPT_URL;
 
         if (proxyUrl && photo_base64) {
           // JALUR PROXY (Bypass Kuota 0GB)
