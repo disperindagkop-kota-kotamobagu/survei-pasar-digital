@@ -18,10 +18,16 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
+import { AuthProvider } from '@/lib/authContext';
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }

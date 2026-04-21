@@ -164,9 +164,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <DashboardContent>{children}</DashboardContent>
-    </AuthProvider>
+    <DashboardContent>{children}</DashboardContent>
   );
 }
 
