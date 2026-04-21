@@ -217,12 +217,19 @@ export default function AdminPage() {
     setSyncLogs(['[START] Memulai Audit Sinkronisasi...']);
     
     try {
-      const toSync = submissions.filter(s => 
-        s.status === 'approved' && 
-        (!s.drive_link || s.drive_link === '-' || !s.drive_link.startsWith('http'))
+      const allApproved = submissions.filter(s => s.status === 'approved');
+      const toSync = allApproved.filter(s => 
+        !s.drive_link || 
+        s.drive_link === '-' || 
+        !s.drive_link.includes('drive.google.com')
       );
       
-      setSyncLogs(prev => [...prev, `[INFO] Ditemukan ${toSync.length} data Approved (termasuk yang gagal sebelumnya).`]);
+      setSyncLogs(prev => [...prev, `[INFO] Total data Disetujui: ${allApproved.length}`]);
+      setSyncLogs(prev => [...prev, `[INFO] Data perlu sinkron: ${toSync.length}`]);
+
+      if (allApproved.length > 0 && toSync.length === 0) {
+        setSyncLogs(prev => [...prev, `[TIP] Data pertama terdeteksi link: "${allApproved[0].drive_link}"`]);
+      }
 
       if (toSync.length === 0) {
         setSyncProgress('Sudah sinkron.');
