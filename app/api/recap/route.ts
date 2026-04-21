@@ -6,8 +6,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { id, amount, notes, market_name, surveyor_name, photo_base64, photo_url, created_at } = body;
 
-    // 1. Setup Google Auth & Validate Key
-    const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    // 1. Setup Google Auth & Validate Key (Added robust sanitization for Vercel/Env quotes)
+    let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
+    
+    // Bersihkan tanda kutip jika ada (sering terjadi di Vercel env)
+    privateKey = privateKey.trim().replace(/^["']|["']$/g, '').replace(/\\n/g, '\n');
+
     if (!privateKey || !privateKey.includes('BEGIN PRIVATE KEY')) {
       return NextResponse.json({ success: false, error: 'Kunci Google (Private Key) tidak valid atau terpotong di Vercel.', phase: 'AUTH_VALIDATION' }, { status: 400 });
     }
