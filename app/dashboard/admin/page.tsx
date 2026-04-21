@@ -8,6 +8,7 @@ export default function AdminPage() {
   const [markets, setMarkets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'markets'>('overview');
   const [timeFilter, setTimeFilter] = useState<'day' | 'week' | 'month' | 'all'>('all');
 
@@ -171,6 +172,35 @@ export default function AdminPage() {
     setExporting(false);
   };
 
+  const handleManualSyncAndCleanup = async () => {
+    if (!confirm('Apakah Anda ingin menyinkronkan data Approved ke Google Drive dan menghapus foto di Supabase untuk menghemat ruang?')) return;
+    
+    setCleaning(true);
+    try {
+      // 1. Sync ke Google (untuk data yang belum punya drive_link)
+      const toSync = submissions.filter(s => s.status === 'approved' && !s.drive_link);
+      console.log(`Menyinkronkan ${toSync.length} data ke Google...`);
+      
+      for (const sub of toSync) {
+        await fetch('/api/recap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sub),
+        });
+      }
+
+      // 2. Jalankan Cleanup
+      const res = await fetch('/api/cleanup');
+      const cleanupResult = await res.json();
+      
+      alert(cleanupResult.message || 'Pembersihan selesai!');
+      fetchData(); // Refresh UI
+    } catch (err: any) {
+      alert('Terjadi kesalahan saat pembersihan: ' + err.message);
+    }
+    setCleaning(false);
+  };
+
   return (
     <>
       <div className="page-header">
@@ -198,6 +228,17 @@ export default function AdminPage() {
             {exporting
               ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Mengekspor...</>
               : <><ExcelIcon /> Export Excel</>
+            }
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={handleManualSyncAndCleanup}
+            disabled={cleaning}
+            style={{ borderColor: 'rgba(16,185,129,0.3)', color: '#10b981' }}
+          >
+            {cleaning
+              ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Memproses...</>
+              : '🔄 Sync & Bersihkan'
             }
           </button>
         </div>

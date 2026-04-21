@@ -61,7 +61,14 @@ export default function SurveyPage() {
   const [locationType, setLocationType] = useState<'toko' | 'ruko' | 'lapak' | 'perorangan'>('lapak');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
-  const [saveResult, setSaveResult] = useState<{type: 'success'|'error', msg: string} | null>(null);
+  const [saveResult, setSaveResult] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
+  
+  // Real-time Sync Modal State
+  const [syncModal, setSyncModal] = useState<{ 
+    show: boolean, 
+    status: 'idle' | 'processing' | 'success' | 'error', 
+    message: string 
+  }>({ show: false, status: 'idle', message: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // History & Edit
@@ -794,23 +801,24 @@ export default function SurveyPage() {
               <button 
                 className="btn btn-primary btn-sm" 
                 onClick={async () => {
-                   alert('Sinkronisasi dimulai... Mohon tunggu pesan sukses atau gagal.');
+                   setSyncModal({ show: true, status: 'processing', message: 'Menghubungkan ke server...' });
                    setLoadingHistory(true);
                    try {
                      const { syncSubmissions } = await import('@/lib/syncService');
                      const result = await (syncSubmissions() as any);
                      
                      if (!result) {
-                        alert('Tidak ada data baru untuk disinkronkan, atau sistem sedang sibuk.');
+                        setSyncModal({ show: true, status: 'success', message: 'Data sudah sinkron.' });
                      } else if (!result.success) {
-                        alert(`Sinkron Gagal: ${result.message}\n\nPastikan Anda sudah menjalankan SQL di Supabase.`);
+                        setSyncModal({ show: true, status: 'error', message: result.message });
                      } else {
-                        alert(`Berhasil! ${result.message}`);
+                        setSyncModal({ show: true, status: 'success', message: result.message });
                      }
                    } catch (err: any) {
-                     alert(`Gagal menjalankan sistem: ${err.message}`);
+                     setSyncModal({ show: true, status: 'error', message: err.message });
                    }
                    await fetchCombinedHistory();
+                   setLoadingHistory(false);
                 }}
                 disabled={loadingHistory}
               >
@@ -899,6 +907,79 @@ export default function SurveyPage() {
           </div>
         </div>
       </div>
+
+      {/* Modern Sync Modal */}
+      {syncModal.show && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, padding: 20, animation: 'fadeIn 0.3s ease'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(30,27,75,0.9), rgba(15,12,41,0.9))',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 24, padding: 32, width: '100%', maxWidth: 320,
+            textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            transform: 'scale(1)', animation: 'popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+          }}>
+            {syncModal.status === 'processing' && (
+              <div style={{ marginBottom: 20 }}>
+                <div className="spinner" style={{ width: 60, height: 60, borderWidth: 4, margin: '0 auto' }} />
+              </div>
+            )}
+            
+            {syncModal.status === 'success' && (
+              <div style={{ 
+                width: 60, height: 60, borderRadius: '50%', background: 'rgba(34,197,94,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px'
+              }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+            )}
+
+            {syncModal.status === 'error' && (
+              <div style={{ 
+                width: 60, height: 60, borderRadius: '50%', background: 'rgba(239,68,68,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px'
+              }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </div>
+            )}
+
+            <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8, color: '#fff' }}>
+              {syncModal.status === 'processing' ? 'Sinkronisasi...' : 
+               syncModal.status === 'success' ? 'Berhasil!' : 'Sinkron Gagal'}
+            </h3>
+            
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginBottom: 24 }}>
+              {syncModal.message}
+            </p>
+
+            {syncModal.status !== 'processing' && (
+              <button 
+                className="btn btn-primary" 
+                style={{ width: '100%', borderRadius: 12 }}
+                onClick={() => setSyncModal(prev => ({ ...prev, show: false }))}
+              >
+                Tutup
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <style jsx global>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn { 
+          from { opacity: 0; transform: scale(0.9); } 
+          to { opacity: 1; transform: scale(1); } 
+        }
+      `}</style>
     </>
 
   );
