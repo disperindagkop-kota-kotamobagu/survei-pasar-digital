@@ -239,10 +239,10 @@ export default function CheckerPage() {
                 <div className="card-content-section">
                   <div className="content-header">
                     <div>
-                      <h3 className="market-name">{sub.market_name}</h3>
+                      <h3 className="market-name">{sub.market_name || 'Pasar Tidak Dikenal'}</h3>
                       <div className="surveyor-info">
-                         <div className="avatar-mini">{sub.surveyor_name.charAt(0)}</div>
-                         <span>{sub.surveyor_name}</span>
+                         <div className="avatar-mini">{(sub.surveyor_name || '?').charAt(0)}</div>
+                         <span>{sub.surveyor_name || 'Tidak Ada Nama'}</span>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
