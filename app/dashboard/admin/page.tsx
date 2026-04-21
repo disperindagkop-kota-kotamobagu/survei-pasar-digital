@@ -186,17 +186,19 @@ export default function AdminPage() {
         body: JSON.stringify({
           id: 'test-diag-' + Date.now(),
           amount: 0,
-          market_name: 'TEST_DIAGNOSTIK',
+          market_name: 'DIAGNOSTIK_TEST',
           surveyor_name: user?.email || 'Admin-Test',
-          location_type: 'tes',
+          location_type: 'tes_foto',
+          // 1x1 Red Pixel PNG to test Drive Upload
+          photo_base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
           created_at: new Date().toISOString(),
-          notes: 'Testing connection from dashboard'
+          notes: 'Testing connection & PHOTO UPLOAD from dashboard'
         }),
       });
 
       const result = await res.json();
       if (result.success) {
-        alert('✅ KONEKSI BERHASIL!\nData test sudah masuk ke Google Drive & Sheets (Tab Master).');
+        alert('✅ KONEKSI & UPLOAD FOTO BERHASIL!\nData test + foto simulasi sudah masuk ke Google Drive & Sheets.\n\nSilakan cek folder "DIAGNOSTIK_TEST" di Drive Anda.');
       } else {
         alert('❌ KONEKSI GAGAL!\nError: ' + (result.error || 'Unknown Error') + '\n\nDetail: ' + JSON.stringify(result.details || {}));
       }

@@ -38,37 +38,36 @@ export async function POST(req: NextRequest) {
 
     let finalPhotoLink = '-';
 
-    // 2. Upload to Google Drive
+    // 2. Upload to Google Drive (Sekarang tanpa silent failure agar error terlihat)
     if (photo_base64 || photo_url) {
-      try {
-        const fileDatePrefix = now.toISOString().slice(0, 10).replace(/-/g, '');
-        const fileName = `${fileDatePrefix}_${market_name}_${body.location_type || 'Lapak'}_${id}.jpg`;
-        let media = {};
+      const fileDatePrefix = now.toISOString().slice(0, 10).replace(/-/g, '');
+      const fileName = `${fileDatePrefix}_${market_name}_${body.location_type || 'Lapak'}_${id}.jpg`;
+      let media = {};
 
-        if (photo_base64) {
-          const buffer = Buffer.from(photo_base64, 'base64');
-          media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(buffer) };
-        } else if (photo_url) {
-          const response = await fetch(photo_url);
-          const arrayBuffer = await response.arrayBuffer();
-          media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(Buffer.from(arrayBuffer)) };
+      if (photo_base64) {
+        const buffer = Buffer.from(photo_base64, 'base64');
+        media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(buffer) };
+      } else if (photo_url) {
+        const response = await fetch(photo_url);
+        if (!response.ok) {
+          throw new Error(`Gagal mengambil foto dari Supabase URL (HTTP ${response.status}). Pastikan Bucket Publik.`);
         }
+        const arrayBuffer = await response.arrayBuffer();
+        media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(Buffer.from(arrayBuffer)) };
+      }
 
-        const driveResponse = await drive.files.create({
-          requestBody: { name: fileName, parents: [dateFolderId] },
-          media: media,
-          fields: 'id, webViewLink',
+      const driveResponse = await drive.files.create({
+        requestBody: { name: fileName, parents: [dateFolderId] },
+        media: media,
+        fields: 'id, webViewLink',
+      });
+
+      if (driveResponse.data.id) {
+        await drive.permissions.create({
+          fileId: driveResponse.data.id,
+          requestBody: { role: 'reader', type: 'anyone' },
         });
-
-        if (driveResponse.data.id) {
-          await drive.permissions.create({
-            fileId: driveResponse.data.id,
-            requestBody: { role: 'reader', type: 'anyone' },
-          });
-          finalPhotoLink = driveResponse.data.webViewLink || '-';
-        }
-      } catch (err: any) {
-        console.error('Google Drive Upload Error:', err.message);
+        finalPhotoLink = driveResponse.data.webViewLink || '-';
       }
     }
 
