@@ -8,16 +8,17 @@ export async function POST(req: NextRequest) {
 
     // 1. Setup Google Auth & Validate Key (Added robust sanitization for Vercel/Env quotes)
     let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
+    const serviceEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '';
     
     // Bersihkan tanda kutip jika ada (sering terjadi di Vercel env)
     privateKey = privateKey.trim().replace(/^["']|["']$/g, '').replace(/\\n/g, '\n');
 
     if (!privateKey || !privateKey.includes('BEGIN PRIVATE KEY')) {
-      return NextResponse.json({ success: false, error: 'Kunci Google (Private Key) tidak valid atau terpotong di Vercel.', phase: 'AUTH_VALIDATION' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Kunci Google (Private Key) tidak valid atau terpotong di Vercel.', phase: 'AUTH_VALIDATION', serviceEmail }, { status: 400 });
     }
 
     const auth = new google.auth.JWT({
-      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      email: serviceEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file']
     });
@@ -68,7 +69,8 @@ export async function POST(req: NextRequest) {
         success: false, 
         error: `Gagal mengelola folder: ${errorMsg}`, 
         phase: 'FOLDER_MANAGEMENT',
-        folderId: maskedFolderId
+        folderId: maskedFolderId,
+        serviceEmail
       }, { status: 500 });
     }
 
@@ -107,7 +109,7 @@ export async function POST(req: NextRequest) {
           finalPhotoLink = driveResponse.data.webViewLink || '-';
         }
       } catch (uploadErr: any) {
-        return NextResponse.json({ success: false, error: `Gagal upload ke Drive: ${uploadErr.message}`, phase: 'DRIVE_UPLOAD' }, { status: 500 });
+        return NextResponse.json({ success: false, error: `Gagal upload ke Drive: ${uploadErr.message}`, phase: 'DRIVE_UPLOAD', serviceEmail }, { status: 500 });
       }
     }
 
@@ -175,7 +177,7 @@ export async function POST(req: NextRequest) {
       appendToSheet(`Bulanan-${monthLabel}`)
     ]);
 
-    return NextResponse.json({ success: true, driveLink: finalPhotoLink });
+    return NextResponse.json({ success: true, driveLink: finalPhotoLink, serviceEmail });
   } catch (error: any) {
     console.error('API Error:', error);
     // Kembalikan pesan error asli agar bisa didiagnosa di dashboard
@@ -184,6 +186,7 @@ export async function POST(req: NextRequest) {
       success: false, 
       error: errorMsg,
       phase: 'UNEXPECTED',
+      serviceEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       details: error.response?.data || error.stack
     }, { status: 500 });
   }
