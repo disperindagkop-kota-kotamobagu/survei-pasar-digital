@@ -76,37 +76,57 @@ export async function POST(req: NextRequest) {
 
     let finalPhotoLink = '-';
 
-    // 2. Upload to Google Drive (Sekarang tanpa silent failure agar error terlihat)
+    // 2. Upload to Google Drive (Sekarang mendukung Proxy Apps Script untuk memintas kuota 0GB)
     if (photo_base64 || photo_url) {
       try {
         const fileDatePrefix = now.toISOString().slice(0, 10).replace(/-/g, '');
         const fileName = `${fileDatePrefix}_${market_name}_${body.location_type || 'Lapak'}_${id}.jpg`;
-        let media = {};
+        const proxyUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
 
-        if (photo_base64) {
-          const buffer = Buffer.from(photo_base64, 'base64');
-          media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(buffer) };
-        } else if (photo_url) {
-          const response = await fetch(photo_url);
-          if (!response.ok) {
-            throw new Error(`Gagal mengambil foto dari Supabase URL (HTTP ${response.status}). Pastikan Bucket Publik.`);
-          }
-          const arrayBuffer = await response.arrayBuffer();
-          media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(Buffer.from(arrayBuffer)) };
-        }
-
-        const driveResponse = await drive.files.create({
-          requestBody: { name: fileName, parents: [dateFolderId] },
-          media: media,
-          fields: 'id, webViewLink',
-        });
-
-        if (driveResponse.data.id) {
-          await drive.permissions.create({
-            fileId: driveResponse.data.id,
-            requestBody: { role: 'reader', type: 'anyone' },
+        if (proxyUrl && photo_base64) {
+          // JALUR PROXY (Bypass Kuota 0GB)
+          const proxyRes = await fetch(proxyUrl, {
+            method: 'POST',
+            body: JSON.stringify({
+              folderId: dateFolderId,
+              photo_base64: photo_base64,
+              fileName: fileName
+            })
           });
-          finalPhotoLink = driveResponse.data.webViewLink || '-';
+          const proxyData = await proxyRes.json();
+          if (proxyData.success) {
+            finalPhotoLink = proxyData.webViewLink;
+          } else {
+            throw new Error(`Proxy Error: ${proxyData.error}`);
+          }
+        } else {
+          // JALUR STANDAR (Service Account)
+          let media = {};
+          if (photo_base64) {
+            const buffer = Buffer.from(photo_base64, 'base64');
+            media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(buffer) };
+          } else if (photo_url) {
+            const response = await fetch(photo_url);
+            if (!response.ok) {
+              throw new Error(`Gagal mengambil foto dari Supabase URL (HTTP ${response.status}). Pastikan Bucket Publik.`);
+            }
+            const arrayBuffer = await response.arrayBuffer();
+            media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(Buffer.from(arrayBuffer)) };
+          }
+
+          const driveResponse = await drive.files.create({
+            requestBody: { name: fileName, parents: [dateFolderId] },
+            media: media,
+            fields: 'id, webViewLink',
+          });
+
+          if (driveResponse.data.id) {
+            await drive.permissions.create({
+              fileId: driveResponse.data.id,
+              requestBody: { role: 'reader', type: 'anyone' },
+            });
+            finalPhotoLink = driveResponse.data.webViewLink || '-';
+          }
         }
       } catch (uploadErr: any) {
         return NextResponse.json({ success: false, error: `Gagal upload ke Drive: ${uploadErr.message}`, phase: 'DRIVE_UPLOAD', serviceEmail }, { status: 500 });
