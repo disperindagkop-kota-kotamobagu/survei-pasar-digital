@@ -32,22 +32,26 @@ export async function syncSubmissions() {
         photoUrl = publicUrl.publicUrl;
       }
 
-      // 2. Insert ke tabel submissions
-      const { error: insertError } = await supabase
+      // 2. Upsert ke tabel submissions (menggunakan id/tempId sebagai primary key)
+      const { error: upsertError } = await supabase
         .from('submissions')
-        .insert({
+        .upsert({
           id: item.tempId,
           surveyor_id: item.surveyor_id,
           market_id: item.market_id,
           amount: item.amount,
-          photo_url: photoUrl,
+          photo_url: photoUrl || undefined, // jangan timpa jika sudah ada dan edit tidak kirim foto
           notes: item.notes,
-          location: `(${item.lat}, ${item.long})`,
+          location_lat: item.lat,
+          location_long: item.long,
+          is_geofence_valid: item.is_geofence_valid,
+          ocr_amount_detect: item.ocr_amount_detect,
           created_at: item.created_at,
-          status: 'pending'
+          status: 'pending',
+          updated_at: new Date().toISOString()
         });
 
-      if (insertError) throw insertError;
+      if (upsertError) throw upsertError;
 
       // 3. Update status di local DB
       if (item.id) await markAsSynced(item.id);

@@ -52,6 +52,50 @@ export default function CheckerPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const handleAutoApprove = async () => {
+    const qualifying = submissions.filter(s => 
+      s.status === 'pending' && 
+      s.is_geofence_valid && 
+      s.ocr_amount_detect && Math.abs(s.ocr_amount_detect - s.amount) < 1
+    );
+
+    if (qualifying.length === 0) {
+      showToast('danger', 'Tidak ada data valid yang memenuhi kriteria otomatis (GPS OK + OCR Cocok).');
+      return;
+    }
+
+    if (!confirm(`Setujui otomatis ${qualifying.length} data yang valid?`)) return;
+
+    setProcessing('auto');
+    let successCount = 0;
+    
+    for (const sub of qualifying) {
+      try {
+        const { supabase } = await import('@/lib/supabaseClient');
+        const { error } = await supabase
+          .from('submissions')
+          .update({ status: 'approved' })
+          .eq('id', sub.id);
+        
+        if (!error) {
+          // Trigger recap for each
+          await fetch('/api/recap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sub),
+          });
+          successCount++;
+        }
+      } catch (e) {
+        console.error('Auto-approve sub error:', e);
+      }
+    }
+
+    showToast('success', `${successCount} data berhasil disetujui otomatis.`);
+    fetchSubmissions();
+    setProcessing(null);
+  };
+
   const handleAction = useCallback(async (id: string, action: 'approved' | 'rejected') => {
     setProcessing(id);
     
@@ -137,20 +181,35 @@ export default function CheckerPage() {
 
       <div className="page-body">
         {/* Filter tabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-          {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-secondary'}`}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+          {/* Filter tabs */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-secondary'}`}
+              >
+                {f === 'all' ? 'Semua' : f === 'pending' ? 'Menunggu' : f === 'approved' ? 'Disetujui' : 'Ditolak'}
+                <span style={{
+                  background: filter === f ? 'rgba(255,255,255,0.2)' : 'rgba(99,102,241,0.15)',
+                  borderRadius: 20, padding: '0 6px', fontSize: 11, fontWeight: 700, marginLeft: 6
+                }}>{counts[f]}</span>
+              </button>
+            ))}
+          </div>
+
+          {filter === 'pending' && counts.pending > 0 && (
+            <button 
+              className="btn btn-primary" 
+              onClick={handleAutoApprove}
+              disabled={processing === 'auto'}
+              style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none' }}
             >
-              {f === 'all' ? 'Semua' : f === 'pending' ? 'Menunggu' : f === 'approved' ? 'Disetujui' : 'Ditolak'}
-              <span style={{
-                background: filter === f ? 'rgba(255,255,255,0.2)' : 'rgba(99,102,241,0.15)',
-                borderRadius: 20, padding: '0 6px', fontSize: 11, fontWeight: 700
-              }}>{counts[f]}</span>
+              {processing === 'auto' ? <span className="spinner" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 8 }}><polyline points="20 6 9 17 4 12"/></svg>}
+              Setujui Otomatis ({submissions.filter(s => s.status === 'pending' && s.is_geofence_valid && s.ocr_amount_detect && Math.abs(s.ocr_amount_detect - s.amount) < 1).length} Valid)
             </button>
-          ))}
+          )}
         </div>
 
         {/* Submission cards grid */}
@@ -199,6 +258,27 @@ export default function CheckerPage() {
                         sub.status === 'pending' ? '⏳ Menunggu' :
                         sub.status === 'approved' ? '✓ Disetujui' : '✗ Ditolak'
                       }</span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                      <span style={{ 
+                        fontSize: 10, padding: '2px 8px', borderRadius: 6, fontWeight: 700,
+                        background: sub.is_geofence_valid ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                        color: sub.is_geofence_valid ? '#10b981' : '#ef4444',
+                        border: `1px solid ${sub.is_geofence_valid ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`
+                      }}>
+                        GPS: {sub.is_geofence_valid ? '✓ VALID' : '✗ LUAR RADIUS'}
+                      </span>
+                      {sub.ocr_amount_detect && (
+                        <span style={{ 
+                          fontSize: 10, padding: '2px 8px', borderRadius: 6, fontWeight: 700,
+                          background: Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                          color: Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? '#10b981' : '#f59e0b',
+                          border: `1px solid ${Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`
+                        }}>
+                          OCR: {Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? `✓ MATCH (Rp ${sub.amount.toLocaleString()})` : `⚠ BEDA (Read: ${sub.ocr_amount_detect.toLocaleString()})`}
+                        </span>
+                      )}
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>

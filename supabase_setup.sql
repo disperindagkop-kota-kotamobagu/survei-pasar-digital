@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   location_lat FLOAT,
   location_long FLOAT,
+  is_geofence_valid BOOLEAN DEFAULT FALSE,
+  ocr_amount_detect DECIMAL(12, 2),
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

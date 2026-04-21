@@ -46,6 +46,54 @@ export default function SurveyPage() {
   const [saveResult, setSaveResult] = useState<{type: 'success'|'error', msg: string} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // History & Edit
+  const [history, setHistory] = useState<any[]>([]);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editingTempId, setEditingTempId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const fetchHistory = async () => {
+    try {
+      const { getAllLocalSubmissions } = await import('@/lib/dexieDb');
+      const data = await getAllLocalSubmissions();
+      setHistory(data);
+    } catch (e) {
+      console.error('Error fetching history:', e);
+    }
+  };
+
+  const clearForm = () => {
+    setSelectedMarket('');
+    setPhotoPreview('');
+    setPhotoBlob(null);
+    setOcrText('');
+    setOcrAmount('');
+    setAmount('');
+    setNotes('');
+    setGeofenceStatus('idle');
+    setLocationData(null);
+    setEditId(null);
+    setEditingTempId(null);
+  };
+
+  const handleEdit = (item: any) => {
+    if (item.synced && item.status && item.status !== 'pending') {
+      alert('Data sudah disah-kan dan tidak bisa diedit lagi.');
+      return;
+    }
+    setEditId(item.id);
+    setEditingTempId(item.tempId);
+    setSelectedMarket(item.market_id);
+    setAmount(item.amount.toString());
+    setNotes(item.notes || '');
+    setPhotoPreview(item.photo_base64 || '');
+    setGeofenceStatus(item.is_geofence_valid ? 'valid' : 'invalid');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // =========================================
   // GEOFENCING
   // =========================================
@@ -127,6 +175,7 @@ export default function SurveyPage() {
       setPhotoSize(formatFileSize(compressed.size));
       const dataUrl = await blobToBase64(compressed);
       setPhotoPreview(dataUrl);
+      
       // Auto-start OCR
       await runOCR(dataUrl);
     } catch (err) {
@@ -134,22 +183,39 @@ export default function SurveyPage() {
     }
   }, []);
 
-  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await processPhoto(file);
-    e.target.value = '';
-  }, [processPhoto]);
+  // Helper to convert dataUrl to grayscale for better OCR
+  const preprocessImage = async (dataUrl: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
+          data[i] = data[i + 1] = data[i + 2] = gray;
+        }
+        ctx.putImageData(imageData, 0, 0);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.src = dataUrl;
+    });
+  };
 
-  // =========================================
-  // OCR — TESSERACT.JS
-  // =========================================
   const runOCR = useCallback(async (imageUrl: string) => {
     setOcrStatus('loading');
     setOcrProgress(0);
     setOcrText('');
     setOcrAmount('');
     try {
+      // Pre-process for better accuracy
+      const processedUrl = await preprocessImage(imageUrl);
+
       const { createWorker } = await import('tesseract.js');
       const worker = await createWorker('ind', 1, {
         logger: (m: any) => {
@@ -158,7 +224,13 @@ export default function SurveyPage() {
           }
         },
       });
-      const { data: { text } } = await worker.recognize(imageUrl);
+
+      // Optimasi untuk angka
+      await worker.setParameters({
+        tessedit_char_whitelist: '0123456789.,Rp ',
+      });
+
+      const { data: { text } } = await worker.recognize(processedUrl);
       await worker.terminate();
       setOcrText(text.trim());
 
@@ -202,9 +274,11 @@ export default function SurveyPage() {
     setSaving(true);
     setSaveResult(null);
     try {
+      const { addPendingSubmission, updatePendingSubmission } = await import('@/lib/dexieDb');
       const market = DEMO_MARKETS.find(m => m.id === selectedMarket);
-      await addPendingSubmission({
-        tempId: crypto.randomUUID(),
+      
+      const payload = {
+        tempId: editingTempId || crypto.randomUUID(),
         surveyor_id: user.id,
         market_id: selectedMarket,
         market_name: market?.name || '',
@@ -213,22 +287,25 @@ export default function SurveyPage() {
         notes,
         lat: locationData?.lat || 0,
         long: locationData?.long || 0,
+        is_geofence_valid: geofenceStatus === 'valid',
+        ocr_amount_detect: ocrAmount ? parseFloat(ocrAmount) : null,
         created_at: new Date().toISOString(),
         synced: false,
-      });
-      setSaveResult({ type: 'success', msg: 'Data berhasil disimpan! Akan otomatis tersinkron saat online.' });
-      // Reset form
-      setSelectedMarket('');
-      setPhotoPreview('');
-      setPhotoBlob(null);
-      setOcrText('');
-      setOcrAmount('');
-      setAmount('');
-      setNotes('');
-      setGeofenceStatus('idle');
-      setLocationData(null);
-    } catch {
-      setSaveResult({ type: 'error', msg: 'Gagal menyimpan data. Coba lagi.' });
+      };
+
+      if (editId) {
+        await updatePendingSubmission(editId, payload);
+        setSaveResult({ type: 'success', msg: 'Data berhasil diperbarui! Sinkronisasi otomatis sedang berjalan.' });
+      } else {
+        await addPendingSubmission(payload);
+        setSaveResult({ type: 'success', msg: 'Data berhasil disimpan! Akan otomatis tersinkron saat online.' });
+      }
+      
+      clearForm();
+      fetchHistory();
+    } catch (err) {
+      console.error('Save error:', err);
+      setSaveResult({ type: 'error', msg: 'Gagal menyimpan data ke database lokal.' });
     }
     setSaving(false);
   };
@@ -611,8 +688,90 @@ export default function SurveyPage() {
             </div>
           </div>
         </form>
+
+        {/* History Section */}
+        <div className="mt-5 pt-5" style={{ borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <div>
+              <h2 style={{ fontSize: 20, fontWeight: 800 }}>Riwayat Input Anda</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Lihat dan perbaiki data yang baru saja dimasukkan</p>
+            </div>
+            <button className="btn btn-secondary btn-sm" onClick={fetchHistory}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+              Refresh
+            </button>
+          </div>
+
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table" style={{ margin: 0 }}>
+                <thead>
+                  <tr>
+                    <th style={{ paddingLeft: 20 }}>Pasar</th>
+                    <th>Nominal</th>
+                    <th>Status</th>
+                    <th>Validitas</th>
+                    <th style={{ textAlign: 'right', paddingRight: 20 }}>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                        Belum ada riwayat input lokal.
+                      </td>
+                    </tr>
+                  ) : (
+                    history.map((item) => (
+                      <tr key={item.tempId}>
+                        <td style={{ paddingLeft: 20 }}>
+                          <div style={{ fontWeight: 600 }}>{item.market_name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(item.created_at).toLocaleString('id-ID')}</div>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                            Rp {item.amount.toLocaleString('id-ID')}
+                          </div>
+                        </td>
+                        <td>
+                          {item.synced ? (
+                            <span className="badge badge-approved" style={{ fontSize: 10 }}>Tersinkron</span>
+                          ) : (
+                            <span className="badge badge-pending" style={{ fontSize: 10, background: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>Menunggu Sinyal</span>
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <span title="Geofence Status" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: item.is_geofence_valid ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: item.is_geofence_valid ? '#22c55e' : '#ef4444' }}>
+                              GPS: {item.is_geofence_valid ? 'OK' : 'Luar'}
+                            </span>
+                            {item.ocr_amount_detect && (
+                              <span title="OCR Status" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: Math.abs(item.ocr_amount_detect - item.amount) < 1 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: Math.abs(item.ocr_amount_detect - item.amount) < 1 ? '#22c55e' : '#ef4444' }}>
+                                OCR: {Math.abs(item.ocr_amount_detect - item.amount) < 1 ? 'Match' : 'Beda'}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'right', paddingRight: 20 }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleEdit(item)}
+                            disabled={item.status && item.status !== 'pending'}
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </>
+
   );
 }
 

@@ -12,9 +12,17 @@ export interface PendingSubmission {
   notes: string;
   lat: number;
   long: number;
+  is_geofence_valid: boolean;
+  ocr_amount_detect: number | null;
   created_at: string;
   synced: boolean;
 }
+
+// ... existing code ...
+
+
+
+
 
 class SurveyorDB extends Dexie {
   pendingSubmissions!: Table<PendingSubmission, number>;
@@ -32,6 +40,11 @@ export const db = new SurveyorDB();
 // Add new pending submission
 export async function addPendingSubmission(data: Omit<PendingSubmission, 'id'>): Promise<number> {
   return db.pendingSubmissions.add({ ...data, synced: false });
+}
+
+// Update existing pending submission
+export async function updatePendingSubmission(id: number, data: Partial<PendingSubmission>): Promise<void> {
+  await db.pendingSubmissions.update(id, data);
 }
 
 // Get all unsynced submissions

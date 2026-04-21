@@ -28,7 +28,10 @@ export interface Submission {
   amount: number;
   photo_url: string;
   status: 'pending' | 'approved' | 'rejected';
-  location?: { lat: number; long: number };
+  location_lat?: number;
+  location_long?: number;
+  is_geofence_valid?: boolean;
+  ocr_amount_detect?: number;
   created_at: string;
   notes?: string;
   surveyor_name?: string;
