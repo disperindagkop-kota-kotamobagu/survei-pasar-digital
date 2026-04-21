@@ -5,6 +5,7 @@ import { Submission } from '@/lib/supabaseClient';
 
 export default function AdminPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [markets, setMarkets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'markets'>('overview');
@@ -17,6 +18,12 @@ export default function AdminPage() {
     setLoading(true);
     try {
       const { supabase } = await import('@/lib/supabaseClient');
+      
+      // Fetch markets
+      const { data: mData } = await supabase.from('markets').select('*');
+      if (mData) setMarkets(mData);
+
+      // Fetch submissions
       const { data, error } = await supabase
         .from('submissions')
         .select(`
@@ -31,6 +38,7 @@ export default function AdminPage() {
           console.error('Fetch error:', error);
         }
         setSubmissions(DEMO_SUBMISSIONS);
+        if (!mData) setMarkets(DEMO_MARKETS);
       } else {
         const transformed: Submission[] = data.map((s: any) => ({
           ...s,
@@ -41,6 +49,7 @@ export default function AdminPage() {
       }
     } catch (e) {
       setSubmissions(DEMO_SUBMISSIONS);
+      setMarkets(DEMO_MARKETS);
     }
     setLoading(false);
   };
@@ -98,9 +107,9 @@ export default function AdminPage() {
         ['Total Nominal Disetujui (Rp)', stats.totalAmount],
         ['Entri Hari Ini', stats.todayCount],
         [],
-        ...DEMO_MARKETS.map(m => {
+        ...markets.map(m => {
           const mSubs = submissions.filter(s => s.market_id === m.id && s.status === 'approved');
-          const total = mSubs.reduce((a, s) => a + s.amount, 0);
+          const total = Number(mSubs.reduce((a, s) => a + Number(s.amount), 0));
           return [m.name, total, mSubs.length + ' transaksi'];
         }),
       ];
@@ -236,11 +245,11 @@ export default function AdminPage() {
         {/* Tab: Per Pasar */}
         {activeTab === 'markets' && (
           <div className="grid-2">
-            {DEMO_MARKETS.map(market => {
+            {markets.map(market => {
               const mSubs = submissions.filter(s => s.market_id === market.id);
               const approved = mSubs.filter(s => s.status === 'approved');
               const pending = mSubs.filter(s => s.status === 'pending');
-              const total = approved.reduce((a, s) => a + s.amount, 0);
+              const total = approved.reduce((a, s) => a + Number(s.amount), 0);
               return (
                 <div key={market.id} className="card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
@@ -272,35 +281,72 @@ export default function AdminPage() {
 
         {/* Tab: Overview chart (visual bars) */}
         {activeTab === 'overview' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 1 }}>
-              Kontribusi Per Pasar (Approved)
-            </h3>
-            {DEMO_MARKETS.map(market => {
-              const mSubs = submissions.filter(s => s.market_id === market.id && s.status === 'approved');
-              const total = mSubs.reduce((a, s) => a + s.amount, 0);
-              const maxTotal = Math.max(...DEMO_MARKETS.map(m =>
-                submissions.filter(s => s.market_id === m.id && s.status === 'approved').reduce((a, s) => a + s.amount, 0)
-              ));
-              const pct = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
-              return (
-                <div key={market.id}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-secondary)', flex: 1 }}>{market.name}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#10b981', flexShrink: 0 }}>
-                      Rp {total.toLocaleString('id')}
-                    </span>
+          <div className="grid-2" style={{ gap: 24, alignItems: 'start' }}>
+            {/* Top Markets Chart */}
+            <div className="card">
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 20 }}>
+                🚀 Kontribusi Per Pasar (Approved)
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {markets.slice(0, 5).map(market => {
+                  const mSubs = submissions.filter(s => s.market_id === market.id && s.status === 'approved');
+                  const total = mSubs.reduce((a, s) => a + Number(s.amount), 0);
+                  const maxTotal = Math.max(...markets.map(m =>
+                    submissions.filter(s => s.market_id === m.id && s.status === 'approved').reduce((a, s) => a + Number(s.amount), 0)
+                  ));
+                  const pct = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
+                  return (
+                    <div key={market.id}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
+                        <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>{market.name}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#10b981' }}>
+                          Rp {total.toLocaleString('id')}
+                        </span>
+                      </div>
+                      <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 10, overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', width: `${pct}%`,
+                          background: 'linear-gradient(90deg, #10b981, #06b6d4)',
+                          borderRadius: 10, transition: 'width 0.8s cubic-bezier(0.4,0,0.2,1)'
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Recent Activity Mini Log */}
+            <div className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  ⏱️ Aktivitas Terbaru
+                </h3>
+                <button onClick={() => setActiveTab('log')} style={{ background: 'none', border: 'none', color: 'var(--primary-light)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Lihat Semua</button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {submissions.slice(0, 5).map((s, i) => (
+                  <div key={s.id} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <div style={{ 
+                      width: 32, height: 32, borderRadius: 8, 
+                      background: s.status === 'approved' ? 'rgba(16,185,129,0.1)' : s.status === 'rejected' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14
+                    }}>
+                      {s.status === 'approved' ? '✅' : s.status === 'rejected' ? '❌' : '⏳'}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                         {s.surveyor_name} — {s.market_name}
+                      </p>
+                      <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {new Date(s.created_at).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit' })} • Rp {s.amount.toLocaleString('id')}
+                      </p>
+                    </div>
                   </div>
-                  <div style={{ height: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', width: `${pct}%`,
-                      background: 'linear-gradient(90deg, #10b981, #06b6d4)',
-                      borderRadius: 4, transition: 'width 0.8s cubic-bezier(0.4,0,0.2,1)'
-                    }} />
-                  </div>
-                </div>
-              );
-            })}
+                ))}
+                {submissions.length === 0 && <p className="text-muted text-sm italic">Belum ada aktivitas hari ini.</p>}
+              </div>
+            </div>
           </div>
         )}
       </div>

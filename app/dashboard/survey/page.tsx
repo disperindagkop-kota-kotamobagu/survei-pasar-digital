@@ -36,7 +36,7 @@ export default function SurveyPage() {
       setMarkets(data || []);
     } catch (e) {
       console.error('Error fetching markets:', e);
-      setMarkets(DEMO_MARKETS);
+      // No fallback to demo data to avoid confusion with live DB
     }
   };
 
