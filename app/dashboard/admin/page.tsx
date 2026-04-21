@@ -1,0 +1,284 @@
+'use client';
+import { useState, useEffect } from 'react';
+import { DEMO_SUBMISSIONS, DEMO_MARKETS } from '@/lib/mockData';
+import { Submission } from '@/lib/supabaseClient';
+
+export default function AdminPage() {
+  const [submissions, setSubmissions] = useState<Submission[]>(DEMO_SUBMISSIONS);
+  const [exporting, setExporting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'markets'>('overview');
+
+  const stats = {
+    total: submissions.length,
+    pending: submissions.filter(s => s.status === 'pending').length,
+    approved: submissions.filter(s => s.status === 'approved').length,
+    rejected: submissions.filter(s => s.status === 'rejected').length,
+    totalAmount: submissions.filter(s => s.status === 'approved').reduce((a, s) => a + s.amount, 0),
+    todayCount: submissions.filter(s => {
+      const today = new Date().toDateString();
+      return new Date(s.created_at).toDateString() === today;
+    }).length,
+  };
+
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      const { utils, writeFile } = await import('xlsx');
+
+      const wsData = [
+        ['No', 'Nama Surveyor', 'Nama Pasar', 'Nominal (Rp)', 'Status', 'Catatan', 'Tanggal'],
+        ...submissions.map((s, i) => [
+          i + 1,
+          s.surveyor_name || '-',
+          s.market_name || '-',
+          s.amount,
+          s.status === 'approved' ? 'Disetujui' : s.status === 'rejected' ? 'Ditolak' : 'Menunggu',
+          s.notes || '-',
+          new Date(s.created_at).toLocaleString('id-ID'),
+        ]),
+      ];
+
+      const wb = utils.book_new();
+      const ws = utils.aoa_to_sheet(wsData);
+
+      // Column widths
+      ws['!cols'] = [
+        { wch: 5 }, { wch: 20 }, { wch: 25 }, { wch: 18 }, { wch: 12 }, { wch: 30 }, { wch: 20 }
+      ];
+
+      utils.book_append_sheet(wb, ws, 'Data Survei');
+
+      // Summary sheet
+      const summaryData = [
+        ['REKAPITULASI DATA SURVEI PASAR KTG'],
+        [`Periode: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`],
+        [],
+        ['Statistik', 'Nilai'],
+        ['Total Entri', stats.total],
+        ['Menunggu Verifikasi', stats.pending],
+        ['Disetujui', stats.approved],
+        ['Ditolak', stats.rejected],
+        ['Total Nominal Disetujui (Rp)', stats.totalAmount],
+        ['Entri Hari Ini', stats.todayCount],
+        [],
+        ...DEMO_MARKETS.map(m => {
+          const mSubs = submissions.filter(s => s.market_id === m.id && s.status === 'approved');
+          const total = mSubs.reduce((a, s) => a + s.amount, 0);
+          return [m.name, total, mSubs.length + ' transaksi'];
+        }),
+      ];
+      const wsSummary = utils.aoa_to_sheet(summaryData);
+      wsSummary['!cols'] = [{ wch: 35 }, { wch: 20 }, { wch: 15 }];
+      utils.book_append_sheet(wb, wsSummary, 'Rekap');
+
+      const filename = `Survei_Pasar_KTG_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      writeFile(wb, filename);
+    } catch (err) {
+      alert('Gagal export. Pastikan library xlsx terinstall.');
+    }
+    setExporting(false);
+  };
+
+  return (
+    <>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Dashboard Admin</h1>
+          <p className="page-subtitle">Monitoring dan pengelolaan data survei seluruh pasar</p>
+        </div>
+        <button
+          className="btn btn-primary"
+          onClick={exportExcel}
+          disabled={exporting}
+        >
+          {exporting
+            ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Mengekspor...</>
+            : <><ExcelIcon /> Export Excel</>
+          }
+        </button>
+      </div>
+
+      <div className="page-body">
+        {/* Stats Grid */}
+        <div className="grid-4 mb-6">
+          {[
+            { label: 'Total Entri', value: stats.total, icon: '📋', color: '#6366f1' },
+            { label: 'Menunggu Verifikasi', value: stats.pending, icon: '⏳', color: '#f59e0b' },
+            { label: 'Disetujui', value: stats.approved, icon: '✅', color: '#10b981' },
+            { label: 'Ditolak', value: stats.rejected, icon: '❌', color: '#ef4444' },
+          ].map((s, i) => (
+            <div key={i} className="stat-card">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 24 }}>{s.icon}</span>
+              </div>
+              <p style={{ fontSize: 32, fontWeight: 800, color: s.color }}>{s.value}</p>
+              <p className="stat-label">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Total Revenue Card */}
+        <div className="card mb-6" style={{
+          background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(6,182,212,0.1))',
+          border: '1px solid rgba(16,185,129,0.3)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+            <div>
+              <p className="text-sm text-muted" style={{ marginBottom: 4 }}>Total Nominal Kontribusi Disetujui (Minggu Ini)</p>
+              <p style={{
+                fontSize: 36, fontWeight: 800,
+                background: 'linear-gradient(135deg, #10b981, #06b6d4)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
+              }}>
+                Rp {stats.totalAmount.toLocaleString('id-ID')}
+              </p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p className="text-sm text-muted">Hari ini</p>
+              <p style={{ fontSize: 24, fontWeight: 700, color: '#10b981' }}>{stats.todayCount} entri</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+          {(['overview', 'log', 'markets'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 14, fontWeight: 600,
+                color: activeTab === tab ? 'var(--primary-light)' : 'var(--text-muted)',
+                borderBottom: activeTab === tab ? '2px solid var(--primary)' : '2px solid transparent',
+                transition: 'all 0.2s', marginBottom: -1
+              }}
+            >
+              {tab === 'overview' ? '📊 Overview' : tab === 'log' ? '📜 Log Aktivitas' : '🏪 Per Pasar'}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab: Log Aktivitas */}
+        {activeTab === 'log' && (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Surveyor</th>
+                  <th>Pasar</th>
+                  <th>Nominal</th>
+                  <th>Status</th>
+                  <th>Waktu</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...submissions]
+                  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                  .map((s, i) => (
+                  <tr key={s.id}>
+                    <td className="text-muted text-sm">{i + 1}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.surveyor_name}</td>
+                    <td className="text-secondary">{s.market_name}</td>
+                    <td style={{ color: '#10b981', fontWeight: 700 }}>Rp {s.amount.toLocaleString('id')}</td>
+                    <td><span className={`badge badge-${s.status}`}>{
+                      s.status === 'pending' ? 'Menunggu' :
+                      s.status === 'approved' ? 'Disetujui' : 'Ditolak'
+                    }</span></td>
+                    <td className="text-sm text-muted">
+                      {new Date(s.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tab: Per Pasar */}
+        {activeTab === 'markets' && (
+          <div className="grid-2">
+            {DEMO_MARKETS.map(market => {
+              const mSubs = submissions.filter(s => s.market_id === market.id);
+              const approved = mSubs.filter(s => s.status === 'approved');
+              const pending = mSubs.filter(s => s.status === 'pending');
+              const total = approved.reduce((a, s) => a + s.amount, 0);
+              return (
+                <div key={market.id} className="card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: 15 }}>{market.name}</p>
+                      <p className="text-xs text-muted" style={{ marginTop: 2 }}>
+                        📍 {market.lat.toFixed(4)}, {market.long.toFixed(4)}
+                      </p>
+                    </div>
+                    <span className="badge badge-synced" style={{ fontSize: 11 }}>{mSubs.length} entri</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 16 }}>
+                    <div>
+                      <p className="text-xs text-muted">Total Diterima</p>
+                      <p style={{ fontSize: 18, fontWeight: 800, color: '#10b981' }}>Rp {total.toLocaleString('id')}</p>
+                    </div>
+                    {pending.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted">Pending</p>
+                        <p style={{ fontSize: 18, fontWeight: 800, color: '#f59e0b' }}>{pending.length}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Tab: Overview chart (visual bars) */}
+        {activeTab === 'overview' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 1 }}>
+              Kontribusi Per Pasar (Approved)
+            </h3>
+            {DEMO_MARKETS.map(market => {
+              const mSubs = submissions.filter(s => s.market_id === market.id && s.status === 'approved');
+              const total = mSubs.reduce((a, s) => a + s.amount, 0);
+              const maxTotal = Math.max(...DEMO_MARKETS.map(m =>
+                submissions.filter(s => s.market_id === m.id && s.status === 'approved').reduce((a, s) => a + s.amount, 0)
+              ));
+              const pct = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
+              return (
+                <div key={market.id}>
+                  <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)', flex: 1 }}>{market.name}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#10b981', flexShrink: 0 }}>
+                      Rp {total.toLocaleString('id')}
+                    </span>
+                  </div>
+                  <div style={{ height: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', width: `${pct}%`,
+                      background: 'linear-gradient(90deg, #10b981, #06b6d4)',
+                      borderRadius: 4, transition: 'width 0.8s cubic-bezier(0.4,0,0.2,1)'
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function ExcelIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="8" x2="16" y1="13" y2="13"/>
+      <line x1="8" x2="16" y1="17" y2="17"/>
+      <polyline points="10 9 9 9 8 9"/>
+    </svg>
+  );
+}
