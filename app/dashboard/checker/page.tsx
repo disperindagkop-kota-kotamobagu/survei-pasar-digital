@@ -12,6 +12,30 @@ export default function CheckerPage() {
 
   useEffect(() => {
     fetchSubmissions();
+
+    // Setup Realtime Subscription
+    let channel: any;
+    
+    const setupRealtime = async () => {
+      const { supabase } = await import('@/lib/supabaseClient');
+      channel = supabase
+        .channel('checker-realtime')
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'submissions' 
+        }, () => {
+          console.log('Realtime update detected!');
+          fetchSubmissions();
+        })
+        .subscribe();
+    };
+
+    setupRealtime();
+
+    return () => {
+      if (channel) channel.unsubscribe();
+    };
   }, []);
 
   const fetchSubmissions = async () => {

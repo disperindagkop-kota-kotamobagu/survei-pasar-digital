@@ -13,6 +13,30 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchData();
+
+    // Setup Realtime Subscription
+    let channel: any;
+    
+    const setupRealtime = async () => {
+      const { supabase } = await import('@/lib/supabaseClient');
+      channel = supabase
+        .channel('admin-realtime')
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'submissions' 
+        }, () => {
+          console.log('Admin: Realtime update detected!');
+          fetchData();
+        })
+        .subscribe();
+    };
+
+    setupRealtime();
+
+    return () => {
+      if (channel) channel.unsubscribe();
+    };
   }, []);
 
   const fetchData = async () => {
