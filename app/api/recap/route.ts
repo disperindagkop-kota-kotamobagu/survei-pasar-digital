@@ -81,8 +81,8 @@ export async function POST(req: NextRequest) {
       try {
         const fileDatePrefix = now.toISOString().slice(0, 10).replace(/-/g, '');
         const fileName = `${fileDatePrefix}_${market_name}_${body.location_type || 'Lapak'}_${id}.jpg`;
-        // Prioritaskan proxy dari body (dashboard), baru env
-        const proxyUrl = body.proxyUrl || process.env.GOOGLE_APPS_SCRIPT_URL;
+        // Gunakan proxyUrl terdeteksi (body -> Sheets Config -> Env)
+        const proxyUrl = finalProxyUrl;
 
         if (proxyUrl && photo_base64) {
           // JALUR PROXY (Bypass Kuota 0GB)
@@ -155,16 +155,55 @@ export async function POST(req: NextRequest) {
     }
     const spreadsheetId = rawSheetId;
     const maskedSheetId = spreadsheetId ? `${spreadsheetId.slice(0, 4)}...${spreadsheetId.slice(-4)}` : 'TIDAK_ADA';
-    
+
+    // FITUR: Simpan Konfigurasi ke Sheets
+    if (body.saveConfig && body.proxyUrl) {
+      try {
+        const configTitle = '_CONFIG_';
+        // Ensure sheet exists
+        try {
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: { requests: [{ addSheet: { properties: { title: configTitle } } }] }
+          });
+        } catch (e) {} // Ignore if already exists
+
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `'${configTitle}'!A1`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [[body.proxyUrl]] },
+        });
+        return NextResponse.json({ success: true, message: 'Konfigurasi tersimpan di Cloud!' });
+      } catch (e: any) {
+        return NextResponse.json({ success: false, error: 'Gagal simpan konfigurasi: ' + e.message }, { status: 500 });
+      }
+    }
+
+    // AUTO-DETECT Proxy dari Sheets (untuk Cron Job)
+    let finalProxyUrl = body.proxyUrl || process.env.GOOGLE_APPS_SCRIPT_URL;
+    if (!finalProxyUrl && spreadsheetId) {
+      try {
+        const configRes = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `'_CONFIG_'!A1`,
+        });
+        if (configRes.data.values && configRes.data.values[0]) {
+          finalProxyUrl = configRes.data.values[0][0];
+        }
+      } catch (e) {} // Ignore if not found
+    }
+
     // Helper to append and ensure tab
     const appendToSheet = async (title: string) => {
       try {
+        const range = `'${title}'!A:G`;
         // Try to append. If fails (likely sheet not found), create it.
         await sheets.spreadsheets.values.append({
           spreadsheetId,
-          range: `${title}!A:G`,
+          range,
           valueInputOption: 'USER_ENTERED',
-          requestBody: { values },
+          requestBody: { values: [values[0]] },
         });
       } catch (err: any) {
         if (err.message.includes('not found') && !err.message.includes('Requested entity was not found')) {
@@ -178,16 +217,16 @@ export async function POST(req: NextRequest) {
           // Add Header
           await sheets.spreadsheets.values.update({
             spreadsheetId,
-            range: `${title}!A1:G1`,
+            range: `'${title}'!A1:G1`,
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: [['Tanggal', 'Surveyor', 'Pasar', 'Tipe', 'Nominal', 'Foto', 'Catatan']] },
           });
           // Re-append
           await sheets.spreadsheets.values.append({
             spreadsheetId,
-            range: `${title}!A:G`,
+            range: `'${title}'!A:G`,
             valueInputOption: 'USER_ENTERED',
-            requestBody: { values },
+            requestBody: { values: [values[0]] },
           });
         } else {
           throw err;

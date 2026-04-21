@@ -5,6 +5,7 @@ import {
   Trash2, 
   RefreshCw, 
   Settings,
+  Save,
   ChevronDown, 
   Search,
   Filter,
@@ -229,6 +230,29 @@ export default function AdminPage() {
     setDiagnosing(false);
   };
 
+  const handleSaveConfig = async () => {
+    if (!proxyUrl) return alert('Silakan masukkan URL Proxy terlebih dahulu.');
+    setCleaning(true);
+    setSyncProgress('Menyimpan...');
+    try {
+      const res = await fetch('/api/recap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ saveConfig: true, proxyUrl }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('✅ Tersimpan di Google Sheets! Kini sinkronisasi otomatis akan lancar.');
+      } else {
+        alert('❌ Gagal simpan: ' + data.error);
+      }
+    } catch (e: any) {
+      alert('❌ Error: ' + e.message);
+    }
+    setCleaning(false);
+    setSyncProgress('');
+  };
+
   const handleManualSyncAndCleanup = async () => {
     if (!confirm('Apakah Anda ingin menyinkronkan data Approved ke Google Drive dan menghapus foto di Supabase untuk menghemat ruang?')) return;
     
@@ -334,6 +358,14 @@ export default function AdminPage() {
               localStorage.setItem('proxy_url', e.target.value);
             }}
           />
+          <button
+            onClick={handleSaveConfig}
+            disabled={cleaning || !proxyUrl}
+            title="Simpan Konfigurasi ke Cloud (Google Sheets)"
+            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white transition-colors"
+          >
+            <Save className="w-4 h-4" />
+          </button>
         </div>
         <button
           onClick={handleManualSyncAndCleanup}
