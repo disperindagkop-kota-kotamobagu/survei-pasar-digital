@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { Submission } from '@/lib/supabaseClient';
-import { DEMO_SUBMISSIONS } from '@/lib/mockData';
+import { Check, X, Camera, MapPin, Scan, Filter, Zap, Clock, Info } from 'lucide-react';
 
 export default function CheckerPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -27,14 +27,10 @@ export default function CheckerPage() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('placeholder')) {
-          console.error('Fetch error:', error);
-        }
-        setSubmissions(DEMO_SUBMISSIONS);
+        console.error('Fetch error:', error);
         return;
       }
 
-      // Transform join data to match Submission interface
       const transformed: Submission[] = data.map((s: any) => ({
         ...s,
         surveyor_name: s.surveyor?.full_name || 'Surveyor Tidak Dikenal',
@@ -43,7 +39,7 @@ export default function CheckerPage() {
 
       setSubmissions(transformed);
     } catch (e) {
-      setSubmissions(DEMO_SUBMISSIONS);
+      console.error('Connection error:', e);
     }
   };
 
@@ -60,7 +56,7 @@ export default function CheckerPage() {
     );
 
     if (qualifying.length === 0) {
-      showToast('danger', 'Tidak ada data valid yang memenuhi kriteria otomatis (GPS OK + OCR Cocok).');
+      showToast('danger', 'Tidak ada data valid yang memenuhi kriteria otomatis.');
       return;
     }
 
@@ -78,7 +74,6 @@ export default function CheckerPage() {
           .eq('id', sub.id);
         
         if (!error) {
-          // Trigger recap for each
           await fetch('/api/recap', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -87,7 +82,7 @@ export default function CheckerPage() {
           successCount++;
         }
       } catch (e) {
-        console.error('Auto-approve sub error:', e);
+        console.error('Auto-approve error:', e);
       }
     }
 
@@ -98,8 +93,6 @@ export default function CheckerPage() {
 
   const handleAction = useCallback(async (id: string, action: 'approved' | 'rejected') => {
     setProcessing(id);
-    
-    // 1. Update Supabase
     try {
       const { supabase } = await import('@/lib/supabaseClient');
       const { error } = await supabase
@@ -107,21 +100,16 @@ export default function CheckerPage() {
         .update({ status: action })
         .eq('id', id);
       
-      if (error && !process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('placeholder')) {
-        showToast('danger', 'Gagal memperbarui status di database.');
+      if (error) {
+        showToast('danger', 'Gagal memperbarui status.');
         setProcessing(null);
         return;
       }
-    } catch (e) {
-      console.log('Supabase update skipped or failed (Demo Mode?)');
-    }
 
-    // 2. If approved, recap to Google
-    if (action === 'approved') {
-      const sub = submissions.find(s => s.id === id);
-      if (sub) {
-        showToast('success', 'Data disetujui. Mengunggah ke Google...');
-        try {
+      if (action === 'approved') {
+        const sub = submissions.find(s => s.id === id);
+        if (sub) {
+          showToast('success', 'Data disetujui. Mengunggah ke Google...');
           const res = await fetch('/api/recap', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -129,23 +117,21 @@ export default function CheckerPage() {
           });
           const result = await res.json();
           if (result.success) {
-            showToast('success', 'Berhasil! Data & Foto telah tersimpan di Drive/Sheets.');
+            showToast('success', 'Berhasil tersinkron ke Google!');
           } else {
-            console.error('Google Recap Error:', result.error);
-            showToast('danger', 'Gagal mengunggah ke Google: ' + result.error);
+            showToast('danger', 'Gagal rekap Google: ' + result.error);
           }
-        } catch (e) {
-          showToast('danger', 'Gagal menghubungi server rekap.');
         }
+      } else {
+        showToast('danger', 'Data telah ditolak.');
       }
-    } else {
-      showToast('danger', 'Data telah ditolak.');
-    }
 
-    setSubmissions(prev =>
-      prev.map(s => s.id === id ? { ...s, status: action } : s)
-    );
-    setProcessing(null);
+      setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: action } : s));
+    } catch (e) {
+      showToast('danger', 'Terjadi kesalahan teknis.');
+    } finally {
+      setProcessing(null);
+    }
   }, [submissions]);
 
   const filtered = filter === 'all' ? submissions : submissions.filter(s => s.status === filter);
@@ -156,182 +142,153 @@ export default function CheckerPage() {
     rejected: submissions.filter(s => s.status === 'rejected').length,
   };
 
+  const autoApprovableCount = submissions.filter(s => s.status === 'pending' && s.is_geofence_valid && s.ocr_amount_detect && Math.abs(s.ocr_amount_detect - s.amount) < 1).length;
+
   return (
     <>
       <div className="page-header">
         <div>
           <h1 className="page-title">Verifikasi Data</h1>
-          <p className="page-subtitle">Periksa dan setujui data survei dari lapangan</p>
+          <p className="page-subtitle">Validasi dan setujui laporan survei pasar harian</p>
         </div>
         {counts.pending > 0 && (
-          <div className="badge badge-pending" style={{ fontSize: 13, padding: '6px 14px' }}>
-            {counts.pending} menunggu verifikasi
+          <div className="pulse-container">
+             <div className="pulse-badge">
+                <span className="pulse-dot" />
+                {counts.pending} Perlu Verifikasi
+             </div>
           </div>
         )}
       </div>
 
-      {/* Toast */}
       {toast && (
         <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999 }}>
-          <div className={`alert alert-${toast.type}`} style={{ boxShadow: 'var(--shadow-lg)', minWidth: 260 }}>
+          <div className={`alert alert-${toast.type} floating-toast`}>
             {toast.msg}
           </div>
         </div>
       )}
 
       <div className="page-body">
-        {/* Filter tabs */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
-          {/* Filter tabs */}
-          <div style={{ display: 'flex', gap: 8 }}>
-            {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-secondary'}`}
-              >
-                {f === 'all' ? 'Semua' : f === 'pending' ? 'Menunggu' : f === 'approved' ? 'Disetujui' : 'Ditolak'}
-                <span style={{
-                  background: filter === f ? 'rgba(255,255,255,0.2)' : 'rgba(99,102,241,0.15)',
-                  borderRadius: 20, padding: '0 6px', fontSize: 11, fontWeight: 700, marginLeft: 6
-                }}>{counts[f]}</span>
-              </button>
-            ))}
-          </div>
-
-          {filter === 'pending' && counts.pending > 0 && (
+        {/* Info & Auto Approve Area */}
+        <div className="card mb-6" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.05), rgba(139,92,246,0.05))', border: '1px solid var(--primary-light)', padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                <Zap size={20} fill="white" />
+              </div>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: 15 }}>Asisten Verifikasi Otomatis</p>
+                <p className="text-xs text-muted">Sistem mendeteksi {autoApprovableCount} data dengan GPS & OCR yang cocok sempurna.</p>
+              </div>
+            </div>
             <button 
               className="btn btn-primary" 
               onClick={handleAutoApprove}
-              disabled={processing === 'auto'}
-              style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none' }}
+              disabled={processing === 'auto' || autoApprovableCount === 0}
+              style={{ background: autoApprovableCount > 0 ? 'var(--primary)' : 'var(--border)', minWidth: 160 }}
             >
-              {processing === 'auto' ? <span className="spinner" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 8 }}><polyline points="20 6 9 17 4 12"/></svg>}
-              Setujui Otomatis ({submissions.filter(s => s.status === 'pending' && s.is_geofence_valid && s.ocr_amount_detect && Math.abs(s.ocr_amount_detect - s.amount) < 1).length} Valid)
+              {processing === 'auto' ? <span className="spinner" /> : <Check size={16} strokeWidth={3} style={{ marginRight: 8 }} />}
+              Setujui {autoApprovableCount} Data
             </button>
-          )}
+          </div>
         </div>
 
-        {/* Submission cards grid */}
+        {/* Filter Navigation */}
+        <div className="filter-nav mb-6">
+          {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`filter-tab ${filter === f ? 'active' : ''}`}
+            >
+              {f === 'all' ? 'Semua Data' : f === 'pending' ? 'Menunggu' : f === 'approved' ? 'Disetujui' : 'Ditolak'}
+              <span className="count-tag">{counts[f]}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Submissions List */}
         {filtered.length === 0 ? (
-          <div className="card text-center" style={{ padding: '60px 24px' }}>
-            <p style={{ fontSize: 40, marginBottom: 12 }}>✅</p>
-            <p className="font-semibold" style={{ marginBottom: 4 }}>Tidak ada data</p>
-            <p className="text-muted text-sm">
-              {filter === 'pending' ? 'Semua data sudah diverifikasi!' : 'Tidak ada data dalam kategori ini.'}
-            </p>
+          <div className="empty-state">
+            <div className="empty-icon">📂</div>
+            <h3>Tidak ada data</h3>
+            <p className="text-muted">Semua data dalam kategori {filter} sudah diproses.</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="submission-list">
             {filtered.map(sub => (
-              <div key={sub.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', gap: 0 }}>
-                  {/* Photo area */}
-                  <div
-                    style={{
-                      width: 140, flexShrink: 0,
-                      background: 'var(--bg-card-2)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      borderRight: '1px solid var(--border)', cursor: sub.photo_url ? 'pointer' : 'default',
-                      minHeight: 120, position: 'relative'
-                    }}
-                    onClick={() => sub.photo_url && setSelectedPhoto(sub.photo_url)}
-                  >
-                    {sub.photo_url ? (
-                      <img src={sub.photo_url} alt="Bukti" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: 12 }}>
-                        <p style={{ fontSize: 28, marginBottom: 4 }}>🖼️</p>
-                        <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>Demo Mode<br/>No Photo</p>
+              <div key={sub.id} className="modern-card">
+                <div className="card-photo-section">
+                  {sub.photo_url ? (
+                    <div className="photo-container" onClick={() => setSelectedPhoto(sub.photo_url)}>
+                      <img src={sub.photo_url} alt="Bukti" />
+                      <div className="photo-overlay">
+                        <Camera size={20} color="white" />
+                        <span>Lihat Foto</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="no-photo">
+                      <Camera size={32} color="var(--text-muted)" />
+                      <p>Sinyal Lemah</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="card-content-section">
+                  <div className="content-header">
+                    <div>
+                      <h3 className="market-name">{sub.market_name}</h3>
+                      <div className="surveyor-info">
+                         <div className="avatar-mini">{sub.surveyor_name.charAt(0)}</div>
+                         <span>{sub.surveyor_name}</span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                       <div className={`status-badge ${sub.status}`}>{sub.status.toUpperCase()}</div>
+                       <p className="time-info"><Clock size={12} style={{ marginRight: 4 }} /> {new Date(sub.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                  </div>
+
+                  <div className="validation-grid">
+                    <div className={`valid-item ${sub.is_geofence_valid ? 'success' : 'danger'}`}>
+                      <MapPin size={14} />
+                      <span>GPS: {sub.is_geofence_valid ? 'BERADA DI LOKASI' : 'DI LUAR RADIUS'}</span>
+                    </div>
+                    {sub.ocr_amount_detect && (
+                      <div className={`valid-item ${Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? 'success' : 'warning'}`}>
+                        <Scan size={14} />
+                        <span>OCR: {Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? 'NOMINAL COCOK' : `BEDA: ${sub.ocr_amount_detect.toLocaleString('id')}`}</span>
                       </div>
                     )}
                   </div>
 
-                  {/* Content */}
-                  <div style={{ flex: 1, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                      <div>
-                        <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>{sub.market_name}</p>
-                        <p className="text-sm text-muted">oleh {sub.surveyor_name}</p>
-                      </div>
-                      <span className={`badge badge-${sub.status}`}>{
-                        sub.status === 'pending' ? '⏳ Menunggu' :
-                        sub.status === 'approved' ? '✓ Disetujui' : '✗ Ditolak'
-                      }</span>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
-                      <span style={{ 
-                        fontSize: 10, padding: '2px 8px', borderRadius: 6, fontWeight: 700,
-                        background: sub.is_geofence_valid ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                        color: sub.is_geofence_valid ? '#10b981' : '#ef4444',
-                        border: `1px solid ${sub.is_geofence_valid ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`
-                      }}>
-                        GPS: {sub.is_geofence_valid ? '✓ VALID' : '✗ LUAR RADIUS'}
-                      </span>
-                      {sub.ocr_amount_detect && (
-                        <span style={{ 
-                          fontSize: 10, padding: '2px 8px', borderRadius: 6, fontWeight: 700,
-                          background: Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
-                          color: Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? '#10b981' : '#f59e0b',
-                          border: `1px solid ${Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`
-                        }}>
-                          OCR: {Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? `✓ MATCH (Rp ${sub.amount.toLocaleString()})` : `⚠ BEDA (Read: ${sub.ocr_amount_detect.toLocaleString()})`}
-                        </span>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                      <div>
-                        <p className="text-xs text-muted">Nominal</p>
-                        <p style={{ fontSize: 22, fontWeight: 800, color: '#10b981' }}>
-                          Rp {sub.amount.toLocaleString('id-ID')}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted">Waktu</p>
-                        <p className="text-sm text-secondary">
-                          {new Date(sub.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                    </div>
-
-                    {sub.notes && (
-                      <p className="text-sm text-secondary" style={{
-                        background: 'rgba(255,255,255,0.03)', padding: '6px 10px', borderRadius: 6,
-                        borderLeft: '3px solid var(--primary)'
-                      }}>
-                        {sub.notes}
-                      </p>
-                    )}
-
-                    {sub.status === 'pending' && (
-                      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                        <button
-                          className="btn btn-success btn-sm"
-                          disabled={processing === sub.id}
-                          onClick={() => handleAction(sub.id, 'approved')}
-                        >
-                          {processing === sub.id
-                            ? <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
-                            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                          }
-                          Setujui
-                        </button>
-                        <button
-                          className="btn btn-danger btn-sm"
-                          disabled={processing === sub.id}
-                          onClick={() => handleAction(sub.id, 'rejected')}
-                        >
-                          {processing === sub.id
-                            ? <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
-                            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
-                          }
-                          Tolak
-                        </button>
-                      </div>
-                    )}
+                  <div className="amount-section">
+                    <p className="amount-val">Rp {sub.amount.toLocaleString('id-ID')}</p>
+                    {sub.notes && <p className="notes-val"><Info size={14} style={{ marginRight: 6 }} /> {sub.notes}</p>}
                   </div>
+
+                  {sub.status === 'pending' && (
+                    <div className="action-footer">
+                      <button
+                        className="btn-action approve"
+                        disabled={!!processing}
+                        onClick={() => handleAction(sub.id, 'approved')}
+                      >
+                        {processing === sub.id ? <span className="spinner-mini" /> : <Check size={18} strokeWidth={3} />}
+                        Setujui Data
+                      </button>
+                      <button
+                        className="btn-action reject"
+                        disabled={!!processing}
+                        onClick={() => handleAction(sub.id, 'rejected')}
+                      >
+                        <X size={18} strokeWidth={3} />
+                        Tolak
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -339,16 +296,300 @@ export default function CheckerPage() {
         )}
       </div>
 
-      {/* Photo lightbox */}
+      {/* Lightbox */}
       {selectedPhoto && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
-          onClick={() => setSelectedPhoto(null)}
-        >
-          <img src={selectedPhoto} alt="Bukti" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 12 }} />
-          <button style={{ position: 'absolute', top: 20, right: 20, width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', fontSize: 18, cursor: 'pointer' }} onClick={() => setSelectedPhoto(null)}>✕</button>
+        <div className="lightbox-overlay" onClick={() => setSelectedPhoto(null)}>
+          <div className="lightbox-content" onClick={e => e.stopPropagation()}>
+            <img src={selectedPhoto} alt="Bukti Terpilih" />
+            <button className="lightbox-close" onClick={() => setSelectedPhoto(null)}>✕</button>
+          </div>
         </div>
       )}
+
+      <style jsx>{`
+        .pulse-container {
+          display: flex;
+          align-items: center;
+        }
+        .pulse-badge {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(99,102,241,0.1);
+          color: var(--primary-light);
+          padding: 6px 14px;
+          border-radius: 20px;
+          font-weight: 700;
+          font-size: 13px;
+        }
+        .pulse-dot {
+          width: 8px;
+          height: 8px;
+          background: #10b981;
+          border-radius: 50%;
+          box-shadow: 0 0 0 rgba(16,185,129, 0.4);
+          animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+          0% { box-shadow: 0 0 0 0 rgba(16,185,129, 0.4); }
+          70% { box-shadow: 0 0 0 10px rgba(16,185,129, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(16,185,129, 0); }
+        }
+
+        .filter-nav {
+          display: flex;
+          gap: 12px;
+          border-bottom: 2px solid var(--border);
+          padding-bottom: 0;
+          overflow-x: auto;
+        }
+        .filter-tab {
+          padding: 12px 20px;
+          background: none;
+          border: none;
+          border-bottom: 3px solid transparent;
+          color: var(--text-muted);
+          font-weight: 700;
+          font-size: 14px;
+          cursor: pointer;
+          white-space: nowrap;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          transition: all 0.2s;
+        }
+        .filter-tab.active {
+          color: var(--primary-light);
+          border-bottom-color: var(--primary);
+        }
+        .count-tag {
+          background: rgba(99,102,241,0.1);
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 11px;
+        }
+        .active .count-tag {
+          background: var(--primary);
+          color: white;
+        }
+
+        .submission-list {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+        .modern-card {
+          display: flex;
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          overflow: hidden;
+          transition: transform 0.2s, box-shadow 0.2s;
+          box-shadow: var(--shadow-sm);
+        }
+        .modern-card:hover {
+          transform: translateY(-4px);
+          box-shadow: var(--shadow-lg);
+        }
+
+        .card-photo-section {
+          width: 180px;
+          min-height: 180px;
+          background: var(--bg-card-2);
+          flex-shrink: 0;
+        }
+        .photo-container {
+          width: 100%;
+          height: 100%;
+          position: relative;
+          cursor: pointer;
+        }
+        .photo-container img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .photo-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(0,0,0,0.5);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          opacity: 0;
+          transition: opacity 0.2s;
+          color: white;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .photo-container:hover .photo-overlay {
+          opacity: 1;
+        }
+        .no-photo {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        .card-content-section {
+          flex: 1;
+          padding: 20px 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .content-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+        }
+        .market-name {
+          font-size: 18px;
+          font-weight: 800;
+          color: var(--text-primary);
+        }
+        .surveyor-info {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 4px;
+          font-size: 13px;
+          color: var(--text-muted);
+        }
+        .avatar-mini {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: var(--primary);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+        }
+        .status-badge {
+          font-size: 10px;
+          font-weight: 800;
+          padding: 4px 10px;
+          border-radius: 6px;
+        }
+        .status-badge.pending { background: rgba(245,158,11,0.1); color: #f59e0b; }
+        .status-badge.approved { background: rgba(16,185,129,0.1); color: #10b981; }
+        .status-badge.rejected { background: rgba(239,68,68,0.1); color: #ef4444; }
+        
+        .time-info {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          font-size: 11px;
+          color: var(--text-muted);
+          margin-top: 4px;
+        }
+
+        .validation-grid {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .valid-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: 8px;
+          font-size: 11px;
+          font-weight: 700;
+          border: 1px solid transparent;
+        }
+        .valid-item.success { background: rgba(16,185,129,0.05); color: #10b981; border-color: rgba(16,185,129,0.2); }
+        .valid-item.danger { background: rgba(239,68,68,0.05); color: #ef4444; border-color: rgba(239,68,68,0.2); }
+        .valid-item.warning { background: rgba(245,158,11,0.05); color: #f59e0b; border-color: rgba(245,158,11,0.2); }
+
+        .amount-val {
+          font-size: 24px;
+          font-weight: 900;
+          color: #10b981;
+        }
+        .notes-val {
+          display: flex;
+          align-items: flex-start;
+          font-size: 13px;
+          color: var(--text-secondary);
+          background: var(--bg-card-2);
+          padding: 10px;
+          border-radius: 10px;
+          margin-top: 8px;
+        }
+
+        .action-footer {
+          display: flex;
+          gap: 12px;
+          margin-top: auto;
+        }
+        .btn-action {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 10px;
+          border-radius: 12px;
+          font-weight: 700;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: none;
+        }
+        .approve { background: var(--primary); color: white; }
+        .approve:hover { background: var(--primary-light); box-shadow: 0 4px 12px rgba(99,102,241, 0.3); }
+        .reject { background: rgba(239,68,68,0.1); color: #ef4444; }
+        .reject:hover { background: rgba(239,68,68,0.2); }
+
+        .lightbox-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.85);
+          backdrop-filter: blur(10px);
+          z-index: 10000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 40px;
+        }
+        .lightbox-content {
+          position: relative;
+          max-width: 90vw;
+          max-height: 90vh;
+        }
+        .lightbox-content img {
+          max-width: 100%;
+          max-height: 90vh;
+          border-radius: 16px;
+          box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        .lightbox-close {
+          position: absolute;
+          top: -30px;
+          right: -30px;
+          background: white;
+          border: none;
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          font-size: 20px;
+          cursor: pointer;
+        }
+
+        @media (max-width: 640px) {
+          .modern-card { flex-direction: column; }
+          .card-photo-section { width: 100%; height: 200px; }
+        }
+      `}</style>
     </>
   );
 }

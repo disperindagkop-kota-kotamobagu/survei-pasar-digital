@@ -2,17 +2,19 @@
 const nextConfig = {
   reactStrictMode: false,
   images: {
-    domains: ['supabase.co', 'your-project.supabase.co'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+      },
+    ],
   },
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-    };
-    return config;
-  },
-  experimental: {
-    serverComponentsExternalPackages: ['@supabase/supabase-js'],
-  },
+  // In Next.js 16, experimental.serverComponentsExternalPackages moved to top level
+  serverExternalPackages: ['@supabase/supabase-js'],
+  // Turbopack is default in Next 16. If using custom webpack, we need to handle it.
+  // Since our webpack extension was empty/standard, we can just allow Turbopack.
+  // Or explicitly set an empty turbopack config to silence the error.
+  turbopack: {},
 };
 
 module.exports = nextConfig;
