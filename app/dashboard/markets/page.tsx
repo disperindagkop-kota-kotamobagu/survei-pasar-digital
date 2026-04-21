@@ -27,7 +27,7 @@ export default function MarketsPage() {
 
   const [toast, setToast] = useState<{ type: 'success' | 'danger'; msg: string } | null>(null);
   
-  const isDemoUser = user?.id.includes('demo');
+  const isDemoUser = !!user?.id?.includes('demo');
 
   useEffect(() => {
     fetchMarkets();
