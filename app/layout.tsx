@@ -19,12 +19,14 @@ export const viewport: Viewport = {
 };
 
 import { AuthProvider } from '@/lib/authContext';
+import PWARegister from './PWARegister';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id">
       <body>
         <AuthProvider>
+          <PWARegister />
           {children}
         </AuthProvider>
       </body>
