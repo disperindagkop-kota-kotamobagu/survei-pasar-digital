@@ -4,12 +4,17 @@ import { base64ToBlob } from './imageCompressor';
 
 export async function syncSubmissions() {
   // Selalu jalankan, biarkan try-catch yang menangani jika benar-benar tidak ada internet.
-  // Ini mencegah masalah navigator.onLine yang sering tidak akurat di beberapa browser mobile.
-
   const pending = await getPendingSubmissions();
   if (pending.length === 0) return { success: true, message: 'Semua data lokal sudah tersinkron.' };
 
-  console.log(`Menyinkronkan ${pending.length} data ke server...`);
+  const { supabase } = await import('./supabaseClient');
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, message: 'Sesi login tidak ditemukan. Mohon login ulang.' };
+  }
+
+  console.log(`Menyinkronkan ${pending.length} data untuk user ${user.email}...`);
 
   for (const item of pending) {
     try {
@@ -41,11 +46,11 @@ export async function syncSubmissions() {
         .from('submissions')
         .upsert({
           id: item.tempId,
-          surveyor_id: item.surveyor_id,
+          surveyor_id: user.id, // Paksa gunakan ID user yang aktif sekarang
           market_id: item.market_id,
           amount: item.amount,
           location_type: item.location_type || 'lapak',
-          photo_url: photoUrl || undefined, // jangan timpa jika sudah ada dan edit tidak kirim foto
+          photo_url: photoUrl || undefined, 
           notes: item.notes,
           location_lat: item.lat,
           location_long: item.long,
