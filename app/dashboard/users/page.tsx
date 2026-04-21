@@ -75,23 +75,26 @@ export default function UsersPage() {
     }
   };
 
-  const handleUpdateRole = async (e: React.FormEvent) => {
+  const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
     setProcessing(true);
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ role: formData.role })
+        .update({ 
+          role: formData.role,
+          full_name: formData.full_name 
+        })
         .eq('id', editingUser.id);
         
       if (error) throw error;
       
-      showToast('success', 'Role berhasil diperbarui.');
+      showToast('success', 'User berhasil diperbarui.');
       setIsEditModalOpen(false);
       fetchUsers();
     } catch (err: any) {
-      showToast('danger', 'Gagal update role: ' + err.message);
+      showToast('danger', 'Gagal update user: ' + err.message);
     } finally {
       setProcessing(false);
     }
@@ -121,7 +124,11 @@ export default function UsersPage() {
 
   const openEditModal = (user: Profile) => {
     setEditingUser(user);
-    setFormData({ ...formData, role: user.role });
+    setFormData({ 
+      ...formData, 
+      role: user.role,
+      full_name: user.full_name || ''
+    });
     setIsEditModalOpen(true);
   };
 
@@ -211,7 +218,7 @@ export default function UsersPage() {
 
                 <div className="user-card-footer">
                   <button className="btn btn-ghost btn-sm" onClick={() => openEditModal(user)}>
-                    <Edit2 size={14} style={{ marginRight: 6 }} /> Edit Role
+                    <Edit2 size={14} style={{ marginRight: 6 }} /> Edit User
                   </button>
                   <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDeleteUser(user.id, user.full_name)}>
                     <Trash2 size={14} style={{ marginRight: 6 }} /> Hapus
@@ -284,16 +291,26 @@ export default function UsersPage() {
         <div className="modal-overlay" onClick={() => setIsEditModalOpen(false)}>
           <div className="modal-container" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 style={{ fontSize: 18, fontWeight: 800 }}>Ubah Role User</h2>
+              <h2 style={{ fontSize: 18, fontWeight: 800 }}>Edit Data User</h2>
               <button className="btn btn-ghost btn-sm" onClick={() => setIsEditModalOpen(false)}>
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleUpdateRole}>
+            <form onSubmit={handleUpdateUser}>
               <div className="modal-body">
-                <p className="text-sm text-muted mb-4">Mengubah hak akses untuk <strong>{editingUser.full_name}</strong></p>
+                <p className="text-sm text-muted mb-4">Mengubah informasi untuk akun petugas.</p>
+                
                 <div className="form-group">
-                  <label className="form-label">Pilih Role Baru</label>
+                  <label className="form-label">Nama Lengkap</label>
+                  <input 
+                    type="text" className="form-input" required 
+                    value={formData.full_name} 
+                    onChange={e => setFormData({...formData, full_name: e.target.value})}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Hak Akses (Role)</label>
                   <select 
                     className="form-select" value={formData.role} 
                     onChange={e => setFormData({...formData, role: e.target.value as Role})}
