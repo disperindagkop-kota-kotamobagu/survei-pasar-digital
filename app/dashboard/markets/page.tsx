@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase, Market } from '@/lib/supabaseClient';
+import { useAuth } from '@/lib/authContext';
+import { ShieldAlert, Info } from 'lucide-react';
 
 // Import MapPicker dynamically to avoid SSR errors
 const MapPicker = dynamic(() => import('@/components/MapPicker'), {
@@ -16,6 +18,7 @@ export default function MarketsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMarket, setEditingMarket] = useState<Market | null>(null);
   
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     lat: '',
@@ -23,6 +26,8 @@ export default function MarketsPage() {
   });
 
   const [toast, setToast] = useState<{ type: 'success' | 'danger'; msg: string } | null>(null);
+  
+  const isDemoUser = user?.id.includes('demo');
 
   useEffect(() => {
     fetchMarkets();
@@ -97,7 +102,21 @@ export default function MarketsPage() {
       long: longVal,
     };
 
+    if (isDemoUser) {
+      showToast('danger', 'Gagal: Akun Demo tidak diizinkan mengubah database asli.');
+      setProcessing(false);
+      return;
+    }
+
     try {
+      console.log('Menyimpan data pasar...', payload);
+      
+      // Ensure we have a valid Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session && !isDemoUser) {
+         throw new Error('Sesi kedaluwarsa. Silakan login ulang.');
+      }
+
       if (editingMarket) {
         const { error } = await supabase
           .from('markets')
@@ -111,6 +130,7 @@ export default function MarketsPage() {
           .insert([payload]);
         if (error) {
           if (error.code === '23505') throw new Error('Nama pasar sudah ada.');
+          if (error.code === '42501') throw new Error('Izin ditolak (RLS). Pastikan Anda login dengan akun Admin asli.');
           throw error;
         }
         showToast('success', 'Pasar berhasil ditambahkan.');
@@ -118,6 +138,7 @@ export default function MarketsPage() {
       fetchMarkets();
       closeModal();
     } catch (err: any) {
+      console.error('Save error details:', err);
       showToast('danger', 'Gagal menyimpan: ' + (err.message || 'Error tidak diketahui'));
     } finally {
       setProcessing(false);
@@ -160,6 +181,16 @@ export default function MarketsPage() {
           <div className={`alert alert-${toast.type}`} style={{ boxShadow: 'var(--shadow-lg)', minWidth: 260 }}>
             <span style={{ marginRight: 8 }}>{toast.type === 'success' ? '✅' : '❌'}</span>
             {toast.msg}
+          </div>
+        </div>
+      )}
+
+      {isDemoUser && (
+        <div className="alert alert-warning mb-6" style={{ margin: '0 32px 24px', borderRadius: 16 }}>
+          <ShieldAlert size={20} />
+          <div>
+            <p className="font-bold">Mode Simulasi (Demo)</p>
+            <p className="text-xs">Anda sedang menggunakan akun demo. Anda dapat melihat data, tapi **tidak bisa** menyimpan perubahan ke database Supabase.</p>
           </div>
         </div>
       )}
