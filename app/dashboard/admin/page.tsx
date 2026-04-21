@@ -7,8 +7,8 @@ export default function AdminPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [markets, setMarkets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'markets'>('overview');
+  const [timeFilter, setTimeFilter] = useState<'day' | 'week' | 'month' | 'all'>('all');
 
   useEffect(() => {
     fetchData();
@@ -54,12 +54,26 @@ export default function AdminPage() {
     setLoading(false);
   };
 
+  const filteredSubmissions = submissions.filter(s => {
+    if (timeFilter === 'all') return true;
+    const date = new Date(s.created_at);
+    const now = new Date();
+    if (timeFilter === 'day') return date.toDateString() === now.toDateString();
+    if (timeFilter === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(now.getDate() - 7);
+      return date >= weekAgo;
+    }
+    if (timeFilter === 'month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    return true;
+  });
+
   const stats = {
-    total: submissions.length,
-    pending: submissions.filter(s => s.status === 'pending').length,
-    approved: submissions.filter(s => s.status === 'approved').length,
-    rejected: submissions.filter(s => s.status === 'rejected').length,
-    totalAmount: submissions.filter(s => s.status === 'approved').reduce((a, s) => a + Number(s.amount), 0),
+    total: filteredSubmissions.length,
+    pending: filteredSubmissions.filter(s => s.status === 'pending').length,
+    approved: filteredSubmissions.filter(s => s.status === 'approved').length,
+    rejected: filteredSubmissions.filter(s => s.status === 'rejected').length,
+    totalAmount: filteredSubmissions.filter(s => s.status === 'approved').reduce((a, s) => a + Number(s.amount), 0),
     todayCount: submissions.filter(s => {
       const today = new Date().toDateString();
       return new Date(s.created_at).toDateString() === today;
@@ -132,16 +146,29 @@ export default function AdminPage() {
           <h1 className="page-title">Dashboard Admin</h1>
           <p className="page-subtitle">Monitoring dan pengelolaan data survei seluruh pasar</p>
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={exportExcel}
-          disabled={exporting}
-        >
-          {exporting
-            ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Mengekspor...</>
-            : <><ExcelIcon /> Export Excel</>
-          }
-        </button>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <select 
+            className="form-select" 
+            style={{ width: 'auto', padding: '0 12px', fontSize: 13 }}
+            value={timeFilter}
+            onChange={(e) => setTimeFilter(e.target.value as any)}
+          >
+            <option value="all">Semua Waktu</option>
+            <option value="day">Hari Ini</option>
+            <option value="week">7 Hari Terakhir</option>
+            <option value="month">Bulan Ini</option>
+          </select>
+          <button
+            className="btn btn-primary"
+            onClick={exportExcel}
+            disabled={exporting}
+          >
+            {exporting
+              ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Mengekspor...</>
+              : <><ExcelIcon /> Export Excel</>
+            }
+          </button>
+        </div>
       </div>
 
       <div className="page-body">
@@ -226,14 +253,24 @@ export default function AdminPage() {
                   <tr key={s.id}>
                     <td className="text-muted text-sm">{i + 1}</td>
                     <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.surveyor_name}</td>
-                    <td className="text-secondary">{s.market_name}</td>
-                    <td style={{ color: '#10b981', fontWeight: 700 }}>Rp {s.amount.toLocaleString('id')}</td>
+                    <td className="text-secondary">
+                        <div style={{ fontWeight: 500 }}>{s.market_name}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{s.location_type || 'Lapak'}</div>
+                    </td>
+                    <td style={{ color: '#10b981', fontWeight: 700 }}>
+                        <div>Rp {s.amount.toLocaleString('id')}</div>
+                        {s.drive_link && (
+                            <a href={s.drive_link} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--primary-light)' }}>
+                                📁 Drive
+                            </a>
+                        )}
+                    </td>
                     <td><span className={`badge badge-${s.status}`}>{
                       s.status === 'pending' ? 'Menunggu' :
                       s.status === 'approved' ? 'Disetujui' : 'Ditolak'
                     }</span></td>
                     <td className="text-sm text-muted">
-                      {new Date(s.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        {new Date(s.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </td>
                   </tr>
                 ))}
@@ -261,7 +298,7 @@ export default function AdminPage() {
                     </div>
                     <span className="badge badge-synced" style={{ fontSize: 11 }}>{mSubs.length} entri</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 16 }}>
+                  <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
                     <div>
                       <p className="text-xs text-muted">Total Diterima</p>
                       <p style={{ fontSize: 18, fontWeight: 800, color: '#10b981' }}>Rp {total.toLocaleString('id')}</p>
@@ -272,6 +309,17 @@ export default function AdminPage() {
                         <p style={{ fontSize: 18, fontWeight: 800, color: '#f59e0b' }}>{pending.length}</p>
                       </div>
                     )}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                    {['toko', 'ruko', 'lapak', 'perorangan'].map(type => {
+                      const count = mSubs.filter(s => s.location_type === type).length;
+                      if (count === 0) return null;
+                      return (
+                        <span key={type} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                          {type}: {count}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               );

@@ -16,6 +16,7 @@ export interface PendingSubmission {
   ocr_amount_detect: number | null;
   created_at: string;
   synced: boolean;
+  location_type?: 'toko' | 'ruko' | 'lapak' | 'perorangan';
 }
 
 // ... existing code ...

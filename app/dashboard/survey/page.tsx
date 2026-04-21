@@ -57,7 +57,7 @@ export default function SurveyPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Form
-  const [amount, setAmount] = useState('');
+  const [locationType, setLocationType] = useState<'toko' | 'ruko' | 'lapak' | 'perorangan'>('lapak');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<{type: 'success'|'error', msg: string} | null>(null);
@@ -65,21 +65,52 @@ export default function SurveyPage() {
 
   // History & Edit
   const [history, setHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [editingTempId, setEditingTempId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchHistory();
-  }, []);
+    fetchCombinedHistory();
+  }, [user]);
 
-  const fetchHistory = async () => {
+  const fetchCombinedHistory = async () => {
+    if (!user) return;
+    setLoadingHistory(true);
     try {
+      // 1. Get Local Pending
       const { getAllLocalSubmissions } = await import('@/lib/dexieDb');
-      const data = await getAllLocalSubmissions();
-      setHistory(data);
+      const localData = await getAllLocalSubmissions();
+      
+      // 2. Get Server Data (if online)
+      let serverData: any[] = [];
+      const { supabase } = await import('@/lib/supabaseClient');
+      const { data, error } = await supabase
+        .from('submissions')
+        .select('*, market:markets(name)')
+        .eq('surveyor_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      if (!error && data) {
+        serverData = data.map(s => ({
+          ...s,
+          market_name: s.market?.name || 'Pasar Tidak Dikenal',
+          synced: true,
+          fromServer: true
+        }));
+      }
+
+      // 3. Merge: Filter out local data that matches server data (using tempId if available)
+      const serverTempIds = new Set(serverData.map(s => s.id)); // Using ID as proxy
+      const finalHistory = [
+        ...localData.filter(l => !l.synced), // Only show unsynced locals
+        ...serverData
+      ].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setHistory(finalHistory);
     } catch (e) {
       console.error('Error fetching history:', e);
     }
+    setLoadingHistory(false);
   };
 
   const clearForm = () => {
@@ -89,6 +120,7 @@ export default function SurveyPage() {
     setOcrText('');
     setOcrAmount('');
     setAmount('');
+    setLocationType('lapak');
     setNotes('');
     setGeofenceStatus('idle');
     setLocationData(null);
@@ -309,6 +341,7 @@ export default function SurveyPage() {
         market_id: selectedMarket,
         market_name: market?.name || '',
         amount: parseFloat(amount),
+        location_type: locationType,
         photo_base64: photoPreview,
         notes,
         lat: locationData?.lat || 0,
@@ -328,7 +361,7 @@ export default function SurveyPage() {
       }
       
       clearForm();
-      fetchHistory();
+      fetchCombinedHistory();
     } catch (err) {
       console.error('Save error:', err);
       setSaveResult({ type: 'error', msg: 'Gagal menyimpan data ke database lokal.' });
@@ -417,7 +450,32 @@ export default function SurveyPage() {
                 )}
               </div>
 
-              {/* Step 2: Nominal & Catatan */}
+              <div className="card">
+                <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    width: 24, height: 24, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 800, color: 'white', flexShrink: 0
+                  }}>2</span>
+                  Tipe Lokasi
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {['toko', 'ruko', 'lapak', 'perorangan'].map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      className={`btn btn-sm ${locationType === type ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setLocationType(type as any)}
+                      style={{ textTransform: 'capitalize', justifyContent: 'center' }}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 3: Nominal & Catatan */}
               <div className="card">
                 <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{
@@ -719,12 +777,12 @@ export default function SurveyPage() {
         <div className="mt-5 pt-5" style={{ borderTop: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <div>
-              <h2 style={{ fontSize: 20, fontWeight: 800 }}>Riwayat Input Anda</h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Lihat dan perbaiki data yang baru saja dimasukkan</p>
+              <h2 style={{ fontSize: 20, fontWeight: 800 }}>Riwayat Survei</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Status sinkronisasi & verifikasi real-time</p>
             </div>
-            <button className="btn btn-secondary btn-sm" onClick={fetchHistory}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-              Refresh
+            <button className="btn btn-secondary btn-sm" onClick={fetchCombinedHistory} disabled={loadingHistory}>
+              {loadingHistory ? <span className="spinner" style={{ width: 14, height: 14 }} /> : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>}
+              Perbarui
             </button>
           </div>
 
@@ -760,23 +818,30 @@ export default function SurveyPage() {
                           </div>
                         </td>
                         <td>
-                          {item.synced ? (
-                            <span className="badge badge-approved" style={{ fontSize: 10 }}>Tersinkron</span>
-                          ) : (
-                            <span className="badge badge-pending" style={{ fontSize: 10, background: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>Menunggu Sinyal</span>
-                          )}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 4 }}>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                              {item.location_type || 'Lapak'}
+                            </span>
                             <span title="Geofence Status" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: item.is_geofence_valid ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: item.is_geofence_valid ? '#22c55e' : '#ef4444' }}>
                               GPS: {item.is_geofence_valid ? 'OK' : 'Luar'}
                             </span>
-                            {item.ocr_amount_detect && (
-                              <span title="OCR Status" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: Math.abs(item.ocr_amount_detect - item.amount) < 1 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: Math.abs(item.ocr_amount_detect - item.amount) < 1 ? '#22c55e' : '#ef4444' }}>
-                                OCR: {Math.abs(item.ocr_amount_detect - item.amount) < 1 ? 'Match' : 'Beda'}
-                              </span>
-                            )}
                           </div>
+                          {item.drive_link && (
+                            <a href={item.drive_link} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--primary-light)', marginTop: 4, display: 'block' }}>
+                               📂 Drive Arsip
+                            </a>
+                          )}
+                        </td>
+                        <td>
+                          {item.fromServer ? (
+                            <span className={`badge badge-${item.status}`} style={{ fontSize: 10 }}>
+                              {item.status === 'approved' ? 'Terverifikasi' : item.status === 'rejected' ? 'Ditolak' : 'Menunggu Chat'}
+                            </span>
+                          ) : (
+                            <span className="badge badge-pending" style={{ fontSize: 10, background: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>
+                               Menunggu Sinkron
+                            </span>
+                          )}
                         </td>
                         <td style={{ textAlign: 'right', paddingRight: 20 }}>
                           <button

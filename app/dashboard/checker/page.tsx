@@ -265,6 +265,11 @@ export default function CheckerPage() {
                 <div className="card-content-section">
                   <div className="content-header">
                     <div>
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', textTransform: 'capitalize', fontWeight: 600 }}>
+                          {sub.location_type || 'Lapak'}
+                        </span>
+                      </div>
                       <h3 className="market-name">{sub.market_name || 'Pasar Tidak Dikenal'}</h3>
                       <div className="surveyor-info">
                          <div className="avatar-mini">{(sub.surveyor_name || '?').charAt(0)}</div>
