@@ -208,7 +208,11 @@ export async function POST(req: NextRequest) {
           requestBody: { values: [values[0]] },
         });
       } catch (err: any) {
-        if (err.message.includes('not found') && !err.message.includes('Requested entity was not found')) {
+        const isMissingSheet = 
+          err.message.includes('not found') || 
+          err.message.includes('Unable to parse range');
+          
+        if (isMissingSheet && !err.message.includes('Requested entity was not found')) {
           // Create Sheet
           await sheets.spreadsheets.batchUpdate({
             spreadsheetId,
