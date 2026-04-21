@@ -11,6 +11,7 @@ export default function AdminPage() {
   const [cleaning, setCleaning] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<string>('');
+  const [syncLogs, setSyncLogs] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'markets'>('overview');
   const [timeFilter, setTimeFilter] = useState<'day' | 'week' | 'month' | 'all'>('all');
 
@@ -213,24 +214,24 @@ export default function AdminPage() {
     
     setCleaning(true);
     setSyncProgress('Inisialisasi...');
+    setSyncLogs(['[START] Memulai Audit Sinkronisasi...']);
+    
     try {
-      // 1. Sync ke Google (untuk data yang belum punya drive_link yang valid)
-      // Kita anggap link di bawah 10 karakter sebagai tidak valid/kosong
       const toSync = submissions.filter(s => 
         s.status === 'approved' && 
         (!s.drive_link || s.drive_link.trim().length < 10)
       );
       
-      console.log('Data yang ditemukan untuk sinkron:', toSync);
+      setSyncLogs(prev => [...prev, `[INFO] Ditemukan ${toSync.length} data Approved.`]);
 
       if (toSync.length === 0) {
-        alert('Semua data Approved terdeteksi sudah sinkron atau tidak ada data baru.');
         setSyncProgress('Sudah sinkron.');
+        setSyncLogs(prev => [...prev, '[DONE] Semua data sudah tersinkron.']);
       } else {
-        alert(`Ditemukan ${toSync.length} data Approved yang belum sinkron ke Google. Memulai proses...`);
         for (let i = 0; i < toSync.length; i++) {
           const sub = toSync[i];
           setSyncProgress(`Memproses ${i + 1}/${toSync.length}: ${sub.market_name}...`);
+          setSyncLogs(prev => [...prev, `[PROCESSING] Data ${i + 1}: ${sub.market_name} (ID: ${sub.id.slice(-5)})`]);
           
           const recapRes = await fetch('/api/recap', {
             method: 'POST',
@@ -238,22 +239,24 @@ export default function AdminPage() {
             body: JSON.stringify(sub),
           });
 
+          const resData = await recapRes.json();
           if (!recapRes.ok) {
-            const errorData = await recapRes.json();
-            throw new Error(`Gagal kirim data ${i + 1}: ${errorData.error || 'Unknown Error'}`);
+            setSyncLogs(prev => [...prev, `[ERROR] Gagal pada Fase ${resData.phase || 'UNKNOWN'}: ${resData.error}`]);
+            throw new Error(`Data ${i + 1} gagal: ${resData.error}`);
           }
+          setSyncLogs(prev => [...prev, `[SUCCESS] Data ${i + 1} terkirim ke Drive & Sheets.`]);
         }
       }
 
-      // 2. Jalankan Cleanup
       setSyncProgress('Membersihkan Supabase...');
+      setSyncLogs(prev => [...prev, '[CLEANUP] Memulai pembersihan foto di Supabase...']);
       const res = await fetch('/api/cleanup');
       const cleanupResult = await res.json();
       
-      alert(cleanupResult.message || 'Pembersihan selesai!');
+      setSyncLogs(prev => [...prev, `[DONE] ${cleanupResult.message}`]);
       fetchData(); // Refresh UI
     } catch (err: any) {
-      alert('TERHENTI: ' + err.message);
+      setSyncLogs(prev => [...prev, `[HALTED] Proses terhenti: ${err.message}`]);
     }
     setCleaning(false);
     setSyncProgress('');
@@ -312,6 +315,18 @@ export default function AdminPage() {
           </button>
         </div>
       </div>
+
+      {syncLogs.length > 0 && (
+        <div className="card mb-6" style={{ background: '#000', color: '#10b981', fontFamily: 'monospace', fontSize: 12, padding: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fff' }}>
+            <strong>Audit Log Sinkronisasi</strong>
+            <button onClick={() => setSyncLogs([])} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>Bersihkan</button>
+          </div>
+          <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+            {syncLogs.map((log, i) => <div key={i} style={{ marginBottom: 4 }}>{log}</div>)}
+          </div>
+        </div>
+      )}
 
       <div className="page-body">
         {/* Stats Grid */}

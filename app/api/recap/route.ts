@@ -6,10 +6,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { id, amount, notes, market_name, surveyor_name, photo_base64, photo_url, created_at } = body;
 
-    // 1. Setup Google Auth
+    // 1. Setup Google Auth & Validate Key
+    const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    if (!privateKey || !privateKey.includes('BEGIN PRIVATE KEY')) {
+      return NextResponse.json({ success: false, error: 'Kunci Google (Private Key) tidak valid atau terpotong di Vercel.', phase: 'AUTH_VALIDATION' }, { status: 400 });
+    }
+
     const auth = new google.auth.JWT({
       email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      key: privateKey,
       scopes: ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file']
     });
 
@@ -33,41 +38,45 @@ export async function POST(req: NextRequest) {
       dateFolderId = await findOrCreateFolder(drive, dateStrOnly, typeFolderId);
     } catch (folderErr: any) {
       console.error('Folder Management Error:', folderErr.message);
-      dateFolderId = rootFolderId;
+      return NextResponse.json({ success: false, error: `Gagal membuat folder di Drive: ${folderErr.message}`, phase: 'FOLDER_MANAGEMENT' }, { status: 500 });
     }
 
     let finalPhotoLink = '-';
 
     // 2. Upload to Google Drive (Sekarang tanpa silent failure agar error terlihat)
     if (photo_base64 || photo_url) {
-      const fileDatePrefix = now.toISOString().slice(0, 10).replace(/-/g, '');
-      const fileName = `${fileDatePrefix}_${market_name}_${body.location_type || 'Lapak'}_${id}.jpg`;
-      let media = {};
+      try {
+        const fileDatePrefix = now.toISOString().slice(0, 10).replace(/-/g, '');
+        const fileName = `${fileDatePrefix}_${market_name}_${body.location_type || 'Lapak'}_${id}.jpg`;
+        let media = {};
 
-      if (photo_base64) {
-        const buffer = Buffer.from(photo_base64, 'base64');
-        media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(buffer) };
-      } else if (photo_url) {
-        const response = await fetch(photo_url);
-        if (!response.ok) {
-          throw new Error(`Gagal mengambil foto dari Supabase URL (HTTP ${response.status}). Pastikan Bucket Publik.`);
+        if (photo_base64) {
+          const buffer = Buffer.from(photo_base64, 'base64');
+          media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(buffer) };
+        } else if (photo_url) {
+          const response = await fetch(photo_url);
+          if (!response.ok) {
+            throw new Error(`Gagal mengambil foto dari Supabase URL (HTTP ${response.status}). Pastikan Bucket Publik.`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(Buffer.from(arrayBuffer)) };
         }
-        const arrayBuffer = await response.arrayBuffer();
-        media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(Buffer.from(arrayBuffer)) };
-      }
 
-      const driveResponse = await drive.files.create({
-        requestBody: { name: fileName, parents: [dateFolderId] },
-        media: media,
-        fields: 'id, webViewLink',
-      });
-
-      if (driveResponse.data.id) {
-        await drive.permissions.create({
-          fileId: driveResponse.data.id,
-          requestBody: { role: 'reader', type: 'anyone' },
+        const driveResponse = await drive.files.create({
+          requestBody: { name: fileName, parents: [dateFolderId] },
+          media: media,
+          fields: 'id, webViewLink',
         });
-        finalPhotoLink = driveResponse.data.webViewLink || '-';
+
+        if (driveResponse.data.id) {
+          await drive.permissions.create({
+            fileId: driveResponse.data.id,
+            requestBody: { role: 'reader', type: 'anyone' },
+          });
+          finalPhotoLink = driveResponse.data.webViewLink || '-';
+        }
+      } catch (uploadErr: any) {
+        return NextResponse.json({ success: false, error: `Gagal upload ke Drive: ${uploadErr.message}`, phase: 'DRIVE_UPLOAD' }, { status: 500 });
       }
     }
 
