@@ -51,6 +51,33 @@ export async function POST(req: NextRequest) {
     const now = new Date(created_at);
     const dateStrOnly = now.toLocaleDateString('id-ID').replace(/\//g, '-'); // DD-MM-YYYY
 
+    // 1.6. Spreadsheet Setup & Smart ID Extractor
+    let rawSheetId = (process.env.GOOGLE_SHEET_ID || '').trim();
+    if (rawSheetId.includes('http')) {
+      const sheetMatch = rawSheetId.match(/\/d\/([a-zA-Z0-9-_]+)/) || rawSheetId.match(/id=([a-zA-Z0-9-_]+)/);
+      if (sheetMatch && sheetMatch[1]) {
+        rawSheetId = sheetMatch[1];
+      }
+    }
+    const spreadsheetId = rawSheetId;
+    const maskedSheetId = spreadsheetId ? `${spreadsheetId.slice(0, 4)}...${spreadsheetId.slice(-4)}` : 'TIDAK_ADA';
+
+    // 1.7. AUTO-DETECT Proxy dari Sheets (untuk Cron Job & Manual Sync)
+    let finalProxyUrl = body.proxyUrl || process.env.GOOGLE_APPS_SCRIPT_URL;
+    if (!finalProxyUrl && spreadsheetId) {
+      try {
+        const configRes = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `'_CONFIG_'!A1`,
+        });
+        if (configRes.data.values && configRes.data.values[0]) {
+          finalProxyUrl = configRes.data.values[0][0];
+        }
+      } catch (e) {
+        // Ignored: Tab _CONFIG_ mungkin belum ada
+      }
+    }
+
     try {
       // Market Folder
       marketFolderId = await findOrCreateFolder(drive, market_name, rootFolderId);
@@ -145,17 +172,6 @@ export async function POST(req: NextRequest) {
       [fullDate, surveyor_name, market_name, body.location_type || 'Lapak', amount, finalPhotoLink, notes || '-']
     ];
 
-    let rawSheetId = (process.env.GOOGLE_SHEET_ID || '').trim();
-    // SMART EXTRACTOR for Sheets
-    if (rawSheetId.includes('http')) {
-      const sheetMatch = rawSheetId.match(/\/d\/([a-zA-Z0-9-_]+)/) || rawSheetId.match(/id=([a-zA-Z0-9-_]+)/);
-      if (sheetMatch && sheetMatch[1]) {
-        rawSheetId = sheetMatch[1];
-      }
-    }
-    const spreadsheetId = rawSheetId;
-    const maskedSheetId = spreadsheetId ? `${spreadsheetId.slice(0, 4)}...${spreadsheetId.slice(-4)}` : 'TIDAK_ADA';
-
     // FITUR: Simpan Konfigurasi ke Sheets
     if (body.saveConfig && body.proxyUrl) {
       try {
@@ -178,20 +194,6 @@ export async function POST(req: NextRequest) {
       } catch (e: any) {
         return NextResponse.json({ success: false, error: 'Gagal simpan konfigurasi: ' + e.message }, { status: 500 });
       }
-    }
-
-    // AUTO-DETECT Proxy dari Sheets (untuk Cron Job)
-    let finalProxyUrl = body.proxyUrl || process.env.GOOGLE_APPS_SCRIPT_URL;
-    if (!finalProxyUrl && spreadsheetId) {
-      try {
-        const configRes = await sheets.spreadsheets.values.get({
-          spreadsheetId,
-          range: `'_CONFIG_'!A1`,
-        });
-        if (configRes.data.values && configRes.data.values[0]) {
-          finalProxyUrl = configRes.data.values[0][0];
-        }
-      } catch (e) {} // Ignore if not found
     }
 
     // Helper to append and ensure tab
