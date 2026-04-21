@@ -69,6 +69,8 @@ export default function LoginPage() {
               onChange={e => setEmail(e.target.value)}
               required
               autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
             />
           </div>
           <div className="form-group">

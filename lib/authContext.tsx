@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Restore session
     try {
-      const saved = sessionStorage.getItem(SESSION_KEY);
+      const saved = localStorage.getItem(SESSION_KEY);
       if (saved) setUser(JSON.parse(saved));
     } catch {}
     setLoading(false);
@@ -42,13 +42,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
     if (found) {
       setUser(found.user);
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(found.user));
+      localStorage.setItem(SESSION_KEY, JSON.stringify(found.user));
       return {};
     }
 
     // Try real Supabase if configured
     if (
       process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.NEXT_PUBLIC_SUPABASE_URL.trim() !== '' &&
       !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')
     ) {
       try {
@@ -63,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .single();
           if (profile) {
             setUser(profile);
-            sessionStorage.setItem(SESSION_KEY, JSON.stringify(profile));
+            localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
             return {};
           }
         }
@@ -77,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     setUser(null);
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
   }, []);
 
   return (
