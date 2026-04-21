@@ -204,7 +204,9 @@ export default function AdminPage() {
       alert('❌ ERROR SISTEM: ' + err.message);
     }
     setDiagnosing(false);
-   const handleManualSyncAndCleanup = async () => {
+  };
+
+  const handleManualSyncAndCleanup = async () => {
     if (!confirm('Apakah Anda ingin menyinkronkan data Approved ke Google Drive dan menghapus foto di Supabase untuk menghemat ruang?')) return;
     
     setCleaning(true);
