@@ -11,8 +11,41 @@ export default function CheckerPage() {
   const [toast, setToast] = useState<{ type: 'success' | 'danger'; msg: string } | null>(null);
 
   useEffect(() => {
-    setSubmissions(DEMO_SUBMISSIONS);
+    fetchSubmissions();
   }, []);
+
+  const fetchSubmissions = async () => {
+    try {
+      const { supabase } = await import('@/lib/supabaseClient');
+      const { data, error } = await supabase
+        .from('submissions')
+        .select(`
+          *,
+          surveyor:profiles(full_name),
+          market:markets(name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('placeholder')) {
+          console.error('Fetch error:', error);
+        }
+        setSubmissions(DEMO_SUBMISSIONS);
+        return;
+      }
+
+      // Transform join data to match Submission interface
+      const transformed: Submission[] = data.map((s: any) => ({
+        ...s,
+        surveyor_name: s.surveyor?.full_name || 'Surveyor Tidak Dikenal',
+        market_name: s.market?.name || 'Pasar Tidak Dikenal'
+      }));
+
+      setSubmissions(transformed);
+    } catch (e) {
+      setSubmissions(DEMO_SUBMISSIONS);
+    }
+  };
 
   const showToast = (type: 'success' | 'danger', msg: string) => {
     setToast({ type, msg });

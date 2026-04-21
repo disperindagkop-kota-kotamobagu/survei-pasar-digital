@@ -7,12 +7,11 @@ export async function POST(req: NextRequest) {
     const { id, amount, notes, market_name, surveyor_name, photo_base64, photo_url, created_at } = body;
 
     // 1. Setup Google Auth
-    const auth = new google.auth.JWT(
-      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      undefined,
-      process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file']
-    );
+    const auth = new google.auth.JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file']
+    });
 
     const drive = google.drive({ version: 'v3', auth });
     const sheets = google.sheets({ version: 'v4', auth });

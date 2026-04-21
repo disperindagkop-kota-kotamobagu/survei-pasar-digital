@@ -4,16 +4,53 @@ import { DEMO_SUBMISSIONS, DEMO_MARKETS } from '@/lib/mockData';
 import { Submission } from '@/lib/supabaseClient';
 
 export default function AdminPage() {
-  const [submissions, setSubmissions] = useState<Submission[]>(DEMO_SUBMISSIONS);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'markets'>('overview');
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const { supabase } = await import('@/lib/supabaseClient');
+      const { data, error } = await supabase
+        .from('submissions')
+        .select(`
+          *,
+          surveyor:profiles(full_name),
+          market:markets(name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('placeholder')) {
+          console.error('Fetch error:', error);
+        }
+        setSubmissions(DEMO_SUBMISSIONS);
+      } else {
+        const transformed: Submission[] = data.map((s: any) => ({
+          ...s,
+          surveyor_name: s.surveyor?.full_name || 'Surveyor Tidak Dikenal',
+          market_name: s.market?.name || 'Pasar Tidak Dikenal'
+        }));
+        setSubmissions(transformed);
+      }
+    } catch (e) {
+      setSubmissions(DEMO_SUBMISSIONS);
+    }
+    setLoading(false);
+  };
 
   const stats = {
     total: submissions.length,
     pending: submissions.filter(s => s.status === 'pending').length,
     approved: submissions.filter(s => s.status === 'approved').length,
     rejected: submissions.filter(s => s.status === 'rejected').length,
-    totalAmount: submissions.filter(s => s.status === 'approved').reduce((a, s) => a + s.amount, 0),
+    totalAmount: submissions.filter(s => s.status === 'approved').reduce((a, s) => a + Number(s.amount), 0),
     todayCount: submissions.filter(s => {
       const today = new Date().toDateString();
       return new Date(s.created_at).toDateString() === today;
