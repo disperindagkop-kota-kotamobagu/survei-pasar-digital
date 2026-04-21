@@ -7,7 +7,7 @@ export async function syncSubmissions() {
   // Ini mencegah masalah navigator.onLine yang sering tidak akurat di beberapa browser mobile.
 
   const pending = await getPendingSubmissions();
-  if (pending.length === 0) return;
+  if (pending.length === 0) return { success: true, message: 'Semua data lokal sudah tersinkron.' };
 
   console.log(`Menyinkronkan ${pending.length} data ke server...`);
 

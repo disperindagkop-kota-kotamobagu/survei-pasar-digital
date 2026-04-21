@@ -794,13 +794,21 @@ export default function SurveyPage() {
               <button 
                 className="btn btn-primary btn-sm" 
                 onClick={async () => {
+                   alert('Sinkronisasi dimulai... Mohon tunggu pesan sukses atau gagal.');
                    setLoadingHistory(true);
-                   const { syncSubmissions } = await import('@/lib/syncService');
-                   const result = await (syncSubmissions() as any);
-                   if (result && !result.success) {
-                     alert(`Sinkron Gagal: ${result.message}\n\nPastikan Anda sudah menjalankan SQL ALTER TABLE di Supabase.`);
-                   } else if (result && result.success) {
-                     alert('Berhasil! Semua data telah tersinkron ke server.');
+                   try {
+                     const { syncSubmissions } = await import('@/lib/syncService');
+                     const result = await (syncSubmissions() as any);
+                     
+                     if (!result) {
+                        alert('Tidak ada data baru untuk disinkronkan, atau sistem sedang sibuk.');
+                     } else if (!result.success) {
+                        alert(`Sinkron Gagal: ${result.message}\n\nPastikan Anda sudah menjalankan SQL di Supabase.`);
+                     } else {
+                        alert(`Berhasil! ${result.message}`);
+                     }
+                   } catch (err: any) {
+                     alert(`Gagal menjalankan sistem: ${err.message}`);
                    }
                    await fetchCombinedHistory();
                 }}
