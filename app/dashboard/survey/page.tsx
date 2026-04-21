@@ -796,7 +796,12 @@ export default function SurveyPage() {
                 onClick={async () => {
                    setLoadingHistory(true);
                    const { syncSubmissions } = await import('@/lib/syncService');
-                   await syncSubmissions();
+                   const result = await (syncSubmissions() as any);
+                   if (result && !result.success) {
+                     alert(`Sinkron Gagal: ${result.message}\n\nPastikan Anda sudah menjalankan SQL ALTER TABLE di Supabase.`);
+                   } else if (result && result.success) {
+                     alert('Berhasil! Semua data telah tersinkron ke server.');
+                   }
                    await fetchCombinedHistory();
                 }}
                 disabled={loadingHistory}

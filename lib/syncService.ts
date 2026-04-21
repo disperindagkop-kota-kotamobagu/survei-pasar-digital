@@ -58,11 +58,12 @@ export async function syncSubmissions() {
       if (item.id) await markAsSynced(item.id);
       console.log(`Sync sukses: ${item.market_name} - ${item.amount}`);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('Gagal sinkronisasi item:', err);
-      // Biarkan tetap pending untuk dicoba lagi nanti
+      return { success: false, message: err.message || 'Terjadi kesalahan saat mengirim data.' };
     }
   }
+  return { success: true, message: 'Semua data berhasil disinkronkan.' };
 }
 
 // Helper to start periodic sync
