@@ -114,7 +114,7 @@ export default function SurveyPage() {
   };
 
   const clearForm = () => {
-    setSelectedMarket('');
+    // Pasar tidak di-reset agar memudahkan input berkali-kali di lokasi yang sama
     setPhotoPreview('');
     setPhotoBlob(null);
     setOcrText('');
@@ -122,10 +122,7 @@ export default function SurveyPage() {
     setAmount('');
     setLocationType('lapak');
     setNotes('');
-    setGeofenceStatus('idle');
-    setLocationData(null);
     setEditId(null);
-    setEditingTempId(null);
   };
 
   const handleEdit = (item: any) => {
