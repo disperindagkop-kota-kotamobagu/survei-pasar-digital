@@ -680,16 +680,33 @@ tbody tr:hover { background: rgba(99,102,241,0.04); }
 .mobile-menu-btn {
   display: none;
   position: fixed;
-  bottom: 24px; right: 24px;
-  width: 56px; height: 56px;
-  border-radius: 50%;
+  top: 50%;
+  left: -4px; /* Setengah timbul */
+  transform: translateY(-50%);
+  width: 44px;
+  height: 64px;
+  border-radius: 0 20px 20px 0;
+  background: var(--primary);
   background: linear-gradient(135deg, var(--primary), var(--secondary));
-  box-shadow: 0 4px 20px rgba(99,102,241,0.5);
-  border: none;
+  box-shadow: 4px 0 15px rgba(99, 102, 241, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-left: none;
   cursor: pointer;
   z-index: 200;
-  align-items: center; justify-content: center;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
   color: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-menu-btn:hover {
+  left: 0;
+  width: 50px;
+}
+
+.mobile-menu-btn.sidebar-open {
+  left: -60px; /* Sembunyikan saat sidebar terbuka */
 }
 
 /* =====================================================
