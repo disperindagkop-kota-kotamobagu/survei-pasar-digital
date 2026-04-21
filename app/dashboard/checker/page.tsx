@@ -21,14 +21,55 @@ export default function CheckerPage() {
 
   const handleAction = useCallback(async (id: string, action: 'approved' | 'rejected') => {
     setProcessing(id);
-    await new Promise(r => setTimeout(r, 800)); // Simulate API
+    
+    // 1. Update Supabase
+    try {
+      const { supabase } = await import('@/lib/supabaseClient');
+      const { error } = await supabase
+        .from('submissions')
+        .update({ status: action })
+        .eq('id', id);
+      
+      if (error && !process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('placeholder')) {
+        showToast('danger', 'Gagal memperbarui status di database.');
+        setProcessing(null);
+        return;
+      }
+    } catch (e) {
+      console.log('Supabase update skipped or failed (Demo Mode?)');
+    }
+
+    // 2. If approved, recap to Google
+    if (action === 'approved') {
+      const sub = submissions.find(s => s.id === id);
+      if (sub) {
+        showToast('success', 'Data disetujui. Mengunggah ke Google...');
+        try {
+          const res = await fetch('/api/recap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sub),
+          });
+          const result = await res.json();
+          if (result.success) {
+            showToast('success', 'Berhasil! Data & Foto telah tersimpan di Drive/Sheets.');
+          } else {
+            console.error('Google Recap Error:', result.error);
+            showToast('danger', 'Gagal mengunggah ke Google: ' + result.error);
+          }
+        } catch (e) {
+          showToast('danger', 'Gagal menghubungi server rekap.');
+        }
+      }
+    } else {
+      showToast('danger', 'Data telah ditolak.');
+    }
+
     setSubmissions(prev =>
       prev.map(s => s.id === id ? { ...s, status: action } : s)
     );
     setProcessing(null);
-    showToast(action === 'approved' ? 'success' : 'danger',
-      action === 'approved' ? 'Data berhasil disetujui!' : 'Data telah ditolak.');
-  }, []);
+  }, [submissions]);
 
   const filtered = filter === 'all' ? submissions : submissions.filter(s => s.status === filter);
   const counts = {
