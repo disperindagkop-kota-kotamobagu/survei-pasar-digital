@@ -82,15 +82,18 @@ export default function SurveyPage() {
       const { getAllLocalSubmissions } = await import('@/lib/dexieDb');
       const localData = await getAllLocalSubmissions();
       
-      // 2. Get Server Data (if online)
+      // 2. Get Server Data (if online) - Only for TODAY
       let serverData: any[] = [];
       const { supabase } = await import('@/lib/supabaseClient');
+      const todayStart = new Date();
+      todayStart.setHours(0,0,0,0);
+
       const { data, error } = await supabase
         .from('submissions')
         .select('*, market:markets(name)')
         .eq('surveyor_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
+        .gte('created_at', todayStart.toISOString())
+        .order('created_at', { ascending: false });
       
       if (!error && data) {
         serverData = data.map(s => ({

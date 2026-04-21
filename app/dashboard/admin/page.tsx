@@ -66,6 +66,13 @@ export default function AdminPage() {
       return date >= weekAgo;
     }
     if (timeFilter === 'month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    if (timeFilter === 'week') {
+      const startOfWeek = new Date(now);
+      const day = startOfWeek.getDay() || 7;
+      startOfWeek.setDate(now.getDate() - day + 1);
+      startOfWeek.setHours(0,0,0,0);
+      return date >= startOfWeek;
+    }
     return true;
   });
 
@@ -301,15 +308,13 @@ export default function AdminPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
                     <div>
-                      <p className="text-xs text-muted">Total Diterima</p>
+                      <p className="text-xs text-muted">Total Diterima ({timeFilter})</p>
                       <p style={{ fontSize: 18, fontWeight: 800, color: '#10b981' }}>Rp {total.toLocaleString('id')}</p>
                     </div>
-                    {pending.length > 0 && (
-                      <div>
-                        <p className="text-xs text-muted">Pending</p>
-                        <p style={{ fontSize: 18, fontWeight: 800, color: '#f59e0b' }}>{pending.length}</p>
-                      </div>
-                    )}
+                    <div>
+                      <p className="text-xs text-muted">Jumlah Data</p>
+                      <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>{approved.length}</p>
+                    </div>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                     {['toko', 'ruko', 'lapak', 'perorangan'].map(type => {
