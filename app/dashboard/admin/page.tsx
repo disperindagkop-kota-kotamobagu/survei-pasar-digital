@@ -245,6 +245,7 @@ export default function AdminPage() {
     }
     setCleaning(false);
     setSyncProgress('');
+  };
 
   return (
     <>
