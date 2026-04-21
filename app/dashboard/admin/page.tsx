@@ -248,7 +248,7 @@ export default function AdminPage() {
               const pct = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
               return (
                 <div key={market.id}>
-                  <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
                     <span style={{ fontSize: 13, color: 'var(--text-secondary)', flex: 1 }}>{market.name}</span>
                     <span style={{ fontSize: 13, fontWeight: 700, color: '#10b981', flexShrink: 0 }}>
                       Rp {total.toLocaleString('id')}
