@@ -25,12 +25,22 @@ export async function POST(req: NextRequest) {
     const drive = google.drive({ version: 'v3', auth });
     const sheets = google.sheets({ version: 'v4', auth });
 
+    // 1.5. Dynamic Folder Management (Hierarchical: Market > Type > Date)
     let marketFolderId = '';
     let typeFolderId = '';
     let dateFolderId = '';
-    const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID?.trim() || '';
+    let rawFolderId = (process.env.GOOGLE_DRIVE_FOLDER_ID || '').trim();
     
-    // Masked ID for debugging
+    // SMART EXTRACTOR: Jika user memasukkan URL, ambil ID-nya saja
+    if (rawFolderId.includes('http')) {
+      const folderMatch = rawFolderId.match(/folders\/([a-zA-Z0-9-_]+)/) || rawFolderId.match(/id=([a-zA-Z0-9-_]+)/);
+      if (folderMatch && folderMatch[1]) {
+        rawFolderId = folderMatch[1];
+      }
+    }
+    const rootFolderId = rawFolderId;
+    
+    // Masked ID for debugging (Ambil 4 awal/akhir dari ID bersih)
     const maskedFolderId = rootFolderId ? `${rootFolderId.slice(0, 4)}...${rootFolderId.slice(-4)}` : 'TIDAK_ADA';
 
     if (!rootFolderId) {
