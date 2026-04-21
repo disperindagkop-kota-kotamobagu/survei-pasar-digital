@@ -199,9 +199,9 @@ export default function AdminPage() {
 
       const result = await res.json();
       if (result.success) {
-        alert('✅ KONEKSI & UPLOAD FOTO BERHASIL!\nData test + foto simulasi sudah masuk ke Google Drive & Sheets.\n\nSilakan cek folder "DIAGNOSTIK_TEST" di Drive Anda.');
+        alert(`✅ KONEKSI & UPLOAD FOTO BERHASIL!\n\nFolder Terdeteksi: ${result.folderId || 'Utama'}\nData test sudah masuk ke Drive & Sheets.`);
       } else {
-        alert('❌ KONEKSI GAGAL!\nError: ' + (result.error || 'Unknown Error') + '\n\nDetail: ' + JSON.stringify(result.details || {}));
+        alert(`❌ KONEKSI GAGAL!\nFase: ${result.phase}\nError: ${result.error}\n\nFolder Terdeteksi: ${result.folderId || 'Tidak Terdeteksi'}`);
       }
     } catch (err: any) {
       alert('❌ ERROR SISTEM: ' + err.message);

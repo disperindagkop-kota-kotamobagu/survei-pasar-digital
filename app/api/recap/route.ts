@@ -25,11 +25,18 @@ export async function POST(req: NextRequest) {
     const drive = google.drive({ version: 'v3', auth });
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // 1.5. Dynamic Folder Management (Hierarchical: Market > Type > Date)
     let marketFolderId = '';
     let typeFolderId = '';
     let dateFolderId = '';
-    const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID!;
+    const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID?.trim() || '';
+    
+    // Masked ID for debugging
+    const maskedFolderId = rootFolderId ? `${rootFolderId.slice(0, 4)}...${rootFolderId.slice(-4)}` : 'TIDAK_ADA';
+
+    if (!rootFolderId) {
+      return NextResponse.json({ success: false, error: 'ID Folder Google Drive belum diisi di Vercel.', phase: 'FOLDER_MANAGEMENT' }, { status: 400 });
+    }
+
     const now = new Date(created_at);
     const dateStrOnly = now.toLocaleDateString('id-ID').replace(/\//g, '-'); // DD-MM-YYYY
 
@@ -42,7 +49,17 @@ export async function POST(req: NextRequest) {
       dateFolderId = await findOrCreateFolder(drive, dateStrOnly, typeFolderId);
     } catch (folderErr: any) {
       console.error('Folder Management Error:', folderErr.message);
-      return NextResponse.json({ success: false, error: `Gagal membuat folder di Drive: ${folderErr.message}`, phase: 'FOLDER_MANAGEMENT' }, { status: 500 });
+      const isNotFound = folderErr.message.includes('File not found') || folderErr.message.includes('not found');
+      const errorMsg = isNotFound 
+        ? `Folder Utama (ID: ${maskedFolderId}) tidak ditemukan atau robot belum dibagikan akses Editor.` 
+        : folderErr.message;
+        
+      return NextResponse.json({ 
+        success: false, 
+        error: `Gagal mengelola folder: ${errorMsg}`, 
+        phase: 'FOLDER_MANAGEMENT',
+        folderId: maskedFolderId
+      }, { status: 500 });
     }
 
     let finalPhotoLink = '-';
@@ -156,6 +173,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ 
       success: false, 
       error: errorMsg,
+      phase: 'UNEXPECTED',
       details: error.response?.data || error.stack
     }, { status: 500 });
   }
