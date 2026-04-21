@@ -3,7 +3,8 @@ import { db, getPendingSubmissions, markAsSynced } from './dexieDb';
 import { base64ToBlob } from './imageCompressor';
 
 export async function syncSubmissions() {
-  if (!navigator.onLine) return;
+  // Selalu jalankan, biarkan try-catch yang menangani jika benar-benar tidak ada internet.
+  // Ini mencegah masalah navigator.onLine yang sering tidak akurat di beberapa browser mobile.
 
   const pending = await getPendingSubmissions();
   if (pending.length === 0) return;
