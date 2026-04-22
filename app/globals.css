@@ -1,5 +1,5 @@
 /* =====================================================
-   SISTEM SURVEI KONTRIBUSI PASAR — DESIGN SYSTEM
+   SISTEM SURVEI KONTRIBUSI PASAR — PREMIUM DESIGN SYSTEM
    ===================================================== */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
@@ -7,7 +7,7 @@
 :root {
   --primary: #6366f1;
   --primary-dark: #4f46e5;
-  --primary-light: #818cf8;
+  --primary-light: #a5b4fc;
   --secondary: #8b5cf6;
   --accent: #06b6d4;
   --success: #10b981;
@@ -15,38 +15,37 @@
   --danger: #ef4444;
   --danger-dark: #dc2626;
 
-  --bg-base: #0f0f1a;
-  --bg-card: #1a1a2e;
+  --bg-base: #0a0a0f;
+  --bg-card: rgba(30, 30, 45, 0.4);
+  --bg-card-solid: #1e1e2d;
   --bg-card-2: #16213e;
-  --bg-glass: rgba(26, 26, 46, 0.8);
-  --bg-hover: rgba(99, 102, 241, 0.1);
+  --bg-glass: rgba(15, 15, 25, 0.7);
+  --bg-hover: rgba(99, 102, 241, 0.08);
 
-  --text-primary: #f1f5f9;
+  --text-primary: #ffffff;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
 
-  --border: rgba(99, 102, 241, 0.2);
-  --border-hover: rgba(99, 102, 241, 0.5);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(99, 102, 241, 0.4);
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.6);
-  --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.2);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.2);
 
   --radius-sm: 8px;
   --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-lg: 20px;
+  --radius-xl: 32px;
 
-  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* --- Reset & Base --- */
+/* --- Base --- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 html { scroll-behavior: smooth; }
-
 body {
   font-family: 'Inter', system-ui, sans-serif;
   background-color: var(--bg-base);
@@ -56,42 +55,54 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* --- Background Gradient Orbs --- */
+/* --- Background Orbs --- */
 body::before {
   content: '';
   position: fixed;
-  top: -20%;
-  left: -10%;
-  width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
+  top: -10%; left: -5%;
+  width: 50vw; height: 50vh;
+  background: radial-gradient(circle, rgba(99,102,241,0.1) 0%, transparent 70%);
+  pointer-events: none; z-index: -1;
+  filter: blur(80px);
 }
 body::after {
   content: '';
   position: fixed;
-  bottom: -20%;
-  right: -10%;
-  width: 500px; height: 500px;
-  background: radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
+  bottom: -10%; right: -5%;
+  width: 50vw; height: 50vh;
+  background: radial-gradient(circle, rgba(6,182,212,0.08) 0%, transparent 70%);
+  pointer-events: none; z-index: -1;
+  filter: blur(80px);
 }
 
-/* =====================================================
-   LAYOUT
-   ===================================================== */
+/* --- Premium Utilities --- */
+.glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+}
+
+.card-premium {
+  background: var(--bg-card);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: var(--transition);
+}
+.card-premium:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+/* --- Layout --- */
 .app-layout {
   display: flex;
   min-height: 100vh;
-  position: relative;
-  z-index: 1;
 }
 
-/* --- Sidebar --- */
 .sidebar {
-  width: 260px;
-  min-height: 100vh;
+  width: 280px;
   background: var(--bg-glass);
   backdrop-filter: blur(20px);
   border-right: 1px solid var(--border);
@@ -100,7 +111,7 @@ body::after {
   position: fixed;
   top: 0; left: 0; bottom: 0;
   z-index: 100;
-  transition: transform 0.3s ease;
+  transition: var(--transition-slow);
 }
 
 .sidebar-logo {
@@ -675,35 +686,37 @@ tbody tr:hover { background: rgba(99,102,241,0.04); }
 .login-subtitle { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
 
 /* =====================================================
-   MOBILE MENU TOGGLE
+   MOBILE MENU TOGGLE — HALF CIRCLE DESIGN
    ===================================================== */
 .mobile-menu-btn {
   display: flex;
   position: fixed;
-  top: 16px;
-  left: 12px;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: var(--primary);
+  top: 80px; /* Di geser ke bawah sedikit agar text diatas kelihatan */
+  left: 0;
+  width: 48px;
+  height: 48px;
+  /* Membuat bentuk setengah lingkaran menempel ke kiri */
+  border-radius: 0 50px 50px 0;
   background: linear-gradient(135deg, var(--primary), var(--secondary));
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 4px 0 15px rgba(99, 102, 241, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  border-left: none;
   cursor: pointer;
   z-index: 200;
   align-items: center;
   justify-content: center;
   color: white;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: var(--transition);
+  padding-right: 6px; /* Offset ikon agar di tengah area lingkaran */
 }
 
 .mobile-menu-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+  width: 54px;
+  box-shadow: 6px 0 20px rgba(99, 102, 241, 0.4);
 }
 
 .mobile-menu-btn.sidebar-open {
-  transform: translateX(-60px); /* Sembunyikan saat sidebar terbuka */
+  transform: translateX(-100%);
   opacity: 0;
 }
 

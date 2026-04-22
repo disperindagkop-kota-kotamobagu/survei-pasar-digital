@@ -115,6 +115,25 @@ export default function CheckerPage() {
     setProcessing(null);
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Hapus data survey ini secara permanen?')) return;
+    setProcessing(id);
+    try {
+      const res = await fetch(`/api/submissions/${id}`, { method: 'DELETE' });
+      const result = await res.json();
+      if (result.success) {
+        showToast('success', 'Data berhasil dihapus dari sistem.');
+        fetchSubmissions();
+      } else {
+        showToast('danger', 'Gagal menghapus: ' + result.error);
+      }
+    } catch (e) {
+      showToast('danger', 'Kesalahan koneksi saat menghapus.');
+    } finally {
+      setProcessing(null);
+    }
+  };
+
   const handleAction = useCallback(async (id: string, action: 'approved' | 'rejected') => {
     setProcessing(id);
     try {
@@ -125,7 +144,7 @@ export default function CheckerPage() {
         .eq('id', id);
       
       if (error) {
-        showToast('danger', 'Gagal memperbarui status.');
+        showToast('danger', 'Gagal memperbarui status database.');
         setProcessing(null);
         return;
       }
@@ -133,7 +152,7 @@ export default function CheckerPage() {
       if (action === 'approved') {
         const sub = submissions.find(s => s.id === id);
         if (sub) {
-          showToast('success', 'Data disetujui. Mengunggah ke Google...');
+          showToast('success', 'Data disetujui. Memulai Sinkron Google...');
           const res = await fetch('/api/recap', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -141,16 +160,16 @@ export default function CheckerPage() {
           });
           const result = await res.json();
           if (result.success) {
-            showToast('success', 'Berhasil tersinkron ke Google!');
+            showToast('success', '✅ ARSIP BERHASIL: Foto & Data terkirim ke Google Cloud!');
           } else {
-            showToast('danger', 'Gagal rekap Google: ' + result.error);
+            showToast('danger', '⚠️ ARSIP GAGAL: Data tersimpan di DB tapi gagal ke Google. Silakan sinkron manual nanti.');
           }
         }
       } else {
         showToast('danger', 'Data telah ditolak.');
       }
 
-      setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: action } : s));
+      fetchSubmissions();
     } catch (e) {
       showToast('danger', 'Terjadi kesalahan teknis.');
     } finally {
@@ -290,9 +309,14 @@ export default function CheckerPage() {
                   <div className="content-header">
                     <div>
                       <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
-                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', textTransform: 'capitalize', fontWeight: 600 }}>
+                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(99,102,241,0.1)', color: 'var(--primary-light)', textTransform: 'capitalize', fontWeight: 600 }}>
                           {sub.location_type || 'Lapak'}
                         </span>
+                        {sub.drive_link && (
+                          <a href={sub.drive_link} target="_blank" rel="noreferrer" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(16,185,129,0.1)', color: 'var(--success)', textDecoration: 'none', fontWeight: 600 }}>
+                            G-SHEETS OPEN
+                          </a>
+                        )}
                       </div>
                       <h3 className="market-name">{sub.market_name || 'Pasar Tidak Dikenal'}</h3>
                       <div className="surveyor-info">
@@ -309,18 +333,31 @@ export default function CheckerPage() {
                   <div className="validation-grid">
                     <div className={`valid-item ${sub.is_geofence_valid ? 'success' : 'danger'}`}>
                       <MapPin size={14} />
-                      <span>GPS: {sub.is_geofence_valid ? 'BERADA DI LOKASI' : 'DI LUAR RADIUS'}</span>
+                      <span>GPS: {sub.is_geofence_valid ? 'SESUAI RADIUS' : 'LUAR RADIUS'}</span>
                     </div>
                     {sub.ocr_amount_detect && (
                       <div className={`valid-item ${Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? 'success' : 'warning'}`}>
                         <Scan size={14} />
-                        <span>OCR: {Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? 'NOMINAL COCOK' : `BEDA: ${sub.ocr_amount_detect.toLocaleString('id')}`}</span>
+                        <span>OCR: {Math.abs(sub.ocr_amount_detect - sub.amount) < 1 ? 'COCOK' : `BEDA (${sub.ocr_amount_detect.toLocaleString('id')})`}</span>
                       </div>
                     )}
                   </div>
 
                   <div className="amount-section">
-                    <p className="amount-val">Rp {sub.amount.toLocaleString('id-ID')}</p>
+                    <div className="flex-between">
+                      <p className="amount-val">Rp {sub.amount.toLocaleString('id-ID')}</p>
+                      {/* Delete always allowed except for auto-syncing process */}
+                      {processing !== sub.id && (
+                        <button 
+                          className="btn btn-ghost" 
+                          style={{ color: 'var(--danger)', opacity: 0.5 }}
+                          onClick={() => handleDelete(sub.id)}
+                          title="Hapus Data Selamanya"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                        </button>
+                      )}
+                    </div>
                     {sub.notes && <p className="notes-val"><Info size={14} style={{ marginRight: 6 }} /> {sub.notes}</p>}
                   </div>
 
@@ -332,7 +369,7 @@ export default function CheckerPage() {
                         onClick={() => handleAction(sub.id, 'approved')}
                       >
                         {processing === sub.id ? <span className="spinner-mini" /> : <Check size={18} strokeWidth={3} />}
-                        Setujui Data
+                        Approve & Arsip Google
                       </button>
                       <button
                         className="btn-action reject"

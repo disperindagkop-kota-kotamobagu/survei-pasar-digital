@@ -156,29 +156,53 @@ export default function SurveyPage() {
   // =========================================
   // GEOFENCING
   // =========================================
-  const checkGeofence = useCallback(async () => {
-    if (!selectedMarket) return;
+  const checkGeofence = useCallback(async (marketIdOverride?: string) => {
+    const marketId = marketIdOverride || selectedMarket;
+    if (!marketId) return;
     setGeofenceStatus('checking');
     setGeofenceMsg('Mengambil lokasi GPS Anda...');
     try {
       const coords = await getUserLocation();
-      const market = markets.find(m => m.id === selectedMarket);
+      const market = markets.find(m => m.id === marketId);
       if (!market) return;
       const dist = haversineDistance(coords.latitude, coords.longitude, market.lat, market.long);
       const distM = Math.round(dist * 1000);
       setLocationData({ lat: coords.latitude, long: coords.longitude, distance: distM });
       if (dist <= 1) {
         setGeofenceStatus('valid');
-        setGeofenceMsg(`✅ Anda berada ${distM}m dari ${market.name}. Dalam radius.`);
+        setGeofenceMsg(`✅ Lokasi Valid: ${distM}m dari ${market.name}.`);
       } else {
         setGeofenceStatus('invalid');
-        setGeofenceMsg(`❌ Anda berada ${distM}m dari ${market.name}. Minimal 1km dari pasar.`);
+        setGeofenceMsg(`❌ Terlalu Jauh: ${distM}m dari ${market.name}. Radius maks 1km.`);
       }
     } catch (err: any) {
       setGeofenceStatus('error');
-      setGeofenceMsg('GPS tidak dapat diakses. Pastikan izin lokasi diaktifkan.');
+      setGeofenceMsg('GPS Error: Pastikan izin lokasi diaktifkan.');
     }
-  }, [selectedMarket]);
+  }, [selectedMarket, markets]);
+
+
+  const handleDelete = async (item: any) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus data ini?')) return;
+    
+    try {
+      if (item.fromServer) {
+        // Delete from Server
+        const res = await fetch(`/api/submissions/${item.id}`, { method: 'DELETE' });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error);
+      } else {
+        // Delete from Local Dexie
+        const { deleteLocalSubmission } = await import('@/lib/dexieDb');
+        await deleteLocalSubmission(item.id);
+      }
+      
+      setSaveResult({ type: 'success', msg: 'Data berhasil dihapus.' });
+      fetchCombinedHistory();
+    } catch (err: any) {
+      alert('Gagal menghapus: ' + err.message);
+    }
+  };
 
 
 
@@ -432,9 +456,13 @@ export default function SurveyPage() {
                 </h3>
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <select
-                    className="form-select"
+                    className="form-select lg:text-lg"
                     value={selectedMarket}
-                    onChange={e => { setSelectedMarket(e.target.value); setGeofenceStatus('idle'); setLocationData(null); }}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedMarket(val);
+                      if (val) checkGeofence(val);
+                    }}
                     required
                   >
                     <option value="">-- Pilih pasar --</option>
@@ -443,19 +471,7 @@ export default function SurveyPage() {
                     ))}
                   </select>
                 </div>
-                {selectedMarket && (
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={checkGeofence}
-                    disabled={geofenceStatus === 'checking'}
-                  >
-                    {geofenceStatus === 'checking'
-                      ? <><span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Mengecek...</>
-                      : <><LocIcon /> Cek Lokasi GPS</>
-                    }
-                  </button>
-                )}
+                {/* GPS button removed as it is now auto-triggered */}
                 {geofenceStatus !== 'idle' && (
                   <div className={`location-card mt-3 ${
                     geofenceStatus === 'checking' ? 'checking' :
@@ -853,50 +869,62 @@ export default function SurveyPage() {
                     </tr>
                   ) : (
                     history.map((item) => (
-                      <tr key={item.tempId}>
+                      <tr key={item.fromServer ? item.id : item.tempId}>
                         <td style={{ paddingLeft: 20 }}>
-                          <div style={{ fontWeight: 600 }}>{item.market_name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(item.created_at).toLocaleString('id-ID')}</div>
+                          <div style={{ fontWeight: 800, color: 'var(--primary-light)' }}>{item.market_name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            {new Date(item.created_at).toLocaleDateString('id-ID')} • {new Date(item.created_at).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })}
+                          </div>
                         </td>
                         <td>
-                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                          <div style={{ fontWeight: 800, color: 'var(--success)', fontSize: 16 }}>
                             Rp {item.amount.toLocaleString('id-ID')}
                           </div>
                         </td>
                         <td>
-                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
-                              {item.location_type || 'Lapak'}
-                            </span>
-                            <span title="Geofence Status" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: item.is_geofence_valid ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: item.is_geofence_valid ? '#22c55e' : '#ef4444' }}>
-                              GPS: {item.is_geofence_valid ? 'OK' : 'Luar'}
-                            </span>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                             {item.fromServer ? (
+                               <span className={`badge badge-${item.status}`} style={{ fontSize: 10 }}>
+                                 {item.status.toUpperCase()}
+                               </span>
+                             ) : (
+                               <span className="badge badge-pending" style={{ fontSize: 10, background: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>
+                                 SINKRONISASI
+                               </span>
+                             )}
+                             {item.synced === 1 && <span className="badge badge-synced" style={{ fontSize: 9 }}>SINKRON</span>}
                           </div>
-                          {item.drive_link && (
-                            <a href={item.drive_link} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--primary-light)', marginTop: 4, display: 'block' }}>
-                               📂 Drive Arsip
-                            </a>
-                          )}
                         </td>
                         <td>
-                          {item.fromServer ? (
-                            <span className={`badge badge-${item.status}`} style={{ fontSize: 10 }}>
-                              {item.status === 'approved' ? 'Terverifikasi' : item.status === 'rejected' ? 'Ditolak' : 'Menunggu Chat'}
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <span title="Geofence Status" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: item.is_geofence_valid ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', color: item.is_geofence_valid ? '#10b981' : '#ef4444', fontWeight: 700 }}>
+                              GPS: {item.is_geofence_valid ? 'OK' : 'FAIL'}
                             </span>
-                          ) : (
-                            <span className="badge badge-pending" style={{ fontSize: 10, background: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>
-                               Menunggu Sinkron
-                            </span>
-                          )}
+                          </div>
                         </td>
                         <td style={{ textAlign: 'right', paddingRight: 20 }}>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => handleEdit(item)}
-                            disabled={item.status && item.status !== 'pending'}
-                          >
-                            Edit
-                          </button>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            {/* edit: strictly for pending or local */}
+                            {(!item.status || item.status === 'pending') && (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => handleEdit(item)}
+                                style={{ padding: '6px 12px' }}
+                              >
+                                Edit
+                              </button>
+                            )}
+                            {/* delete: always allowed except for approved */}
+                            {item.status !== 'approved' && (
+                              <button
+                                className="btn btn-danger btn-sm"
+                                onClick={() => handleDelete(item)}
+                                style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', padding: '6px 12px', border: '1px solid rgba(239,68,68,0.2)' }}
+                              >
+                                Hapus
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))

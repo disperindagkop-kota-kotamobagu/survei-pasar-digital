@@ -71,3 +71,8 @@ export async function countPending(): Promise<number> {
 export async function getAllLocalSubmissions(): Promise<PendingSubmission[]> {
   return db.pendingSubmissions.orderBy('created_at').reverse().toArray();
 }
+
+// Delete local submission
+export async function deleteLocalSubmission(id: number): Promise<void> {
+  await db.pendingSubmissions.delete(id);
+}

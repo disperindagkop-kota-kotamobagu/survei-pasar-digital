@@ -253,65 +253,41 @@ export default function AdminPage() {
     setSyncProgress('');
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Hapus data survey ini secara permanen dari database & storage Supabase?')) return;
+    setCleaning(true);
+    try {
+      const res = await fetch(`/api/submissions/${id}`, { method: 'DELETE' });
+      const result = await res.json();
+      if (result.success) {
+        fetchData();
+      } else {
+        alert('Gagal menghapus: ' + result.error);
+      }
+    } catch (e) {
+      alert('Kesalahan koneksi saat menghapus.');
+    } finally {
+      setCleaning(false);
+    }
+  };
+
   const handleManualSyncAndCleanup = async () => {
-    if (!confirm('Apakah Anda ingin menyinkronkan data Approved ke Google Drive dan menghapus foto di Supabase untuk menghemat ruang?')) return;
+    if (!confirm('Jalankan pembersihan rutin? Data Approved yang sudah punya link arsip (G-Drive) akan dihapus fotonya dari Supabase.')) return;
     
     setCleaning(true);
-    setSyncProgress('Inisialisasi...');
-    setSyncLogs(['[START] Memulai Audit Sinkronisasi...']);
+    setSyncProgress('Membersihkan...');
+    setSyncLogs(['[START] Menjalankan Routine Cleanup Pembersihan Foto...']);
     
     try {
-      const allApproved = submissions.filter(s => s.status === 'approved');
-      const toSync = allApproved.filter(s => 
-        !s.drive_link || 
-        s.drive_link === '-' || 
-        !s.drive_link.includes('drive.google.com')
-      );
-      
-      setSyncLogs(prev => [...prev, `[INFO] Total data Disetujui: ${allApproved.length}`]);
-      setSyncLogs(prev => [...prev, `[INFO] Data perlu sinkron: ${toSync.length}`]);
-
-      if (allApproved.length > 0 && toSync.length === 0) {
-        setSyncLogs(prev => [...prev, `[TIP] Data pertama terdeteksi link: "${allApproved[0].drive_link}"`]);
-      }
-
-      if (toSync.length === 0) {
-        setSyncProgress('Sudah sinkron.');
-        setSyncLogs(prev => [...prev, '[DONE] Semua data sudah tersinkron.']);
-      } else {
-        for (let i = 0; i < toSync.length; i++) {
-          const sub = toSync[i];
-          const hasPhoto = sub.photo_url && sub.photo_url !== '';
-          
-          setSyncProgress(`Memproses ${i + 1}/${toSync.length}: ${sub.market_name}...`);
-          setSyncLogs(prev => [...prev, `[PROCESSING] ${hasPhoto ? '📸' : '📄'} Data ${i + 1}: ${sub.market_name} (ID: ${sub.id.slice(-5)})`]);
-          
-          const recapRes = await fetch('/api/recap', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...sub, proxyUrl }),
-          });
-
-          const resData = await recapRes.json();
-          if (!recapRes.ok) {
-            setSyncLogs(prev => [...prev, `[ERROR] Gagal pada Fase ${resData.phase || 'UNKNOWN'}: ${resData.error}`]);
-            throw new Error(`Data ${i + 1} gagal: ${resData.error}`);
-          }
-          
-          if (resData.driveLink === '-') {
-             setSyncLogs(prev => [...prev, `[INFO] Data ${i + 1} terkirim ke Sheets (Tanpa Foto).`]);
-          } else {
-             setSyncLogs(prev => [...prev, `[SUCCESS] Data ${i + 1} terkirim ke Drive & Sheets.`]);
-          }
-        }
-      }
-
-      setSyncProgress('Membersihkan Supabase...');
-      setSyncLogs(prev => [...prev, '[CLEANUP] Memulai pembersihan foto di Supabase...']);
       const res = await fetch('/api/cleanup');
       const cleanupResult = await res.json();
       
-      setSyncLogs(prev => [...prev, `[DONE] ${cleanupResult.message}`]);
+      if (cleanupResult.success) {
+        setSyncLogs(prev => [...prev, `[DONE] ${cleanupResult.message}`]);
+      } else {
+        setSyncLogs(prev => [...prev, `[ERROR] ${cleanupResult.error || 'Gagal membersihkan'}`]);
+      }
+      
       fetchData(); // Refresh UI
     } catch (err: any) {
       setSyncLogs(prev => [...prev, `[HALTED] Proses terhenti: ${err.message}`]);
@@ -405,18 +381,16 @@ export default function AdminPage() {
 
       <div className="page-body">
         {/* Stats Grid */}
-        <div className="grid-4 mb-6">
+        <div className="grid-4 mb-8">
           {[
-            { label: 'Total Entri', value: stats.total, icon: '📋', color: '#6366f1' },
-            { label: 'Menunggu Verifikasi', value: stats.pending, icon: '⏳', color: '#f59e0b' },
-            { label: 'Disetujui', value: stats.approved, icon: '✅', color: '#10b981' },
-            { label: 'Ditolak', value: stats.rejected, icon: '❌', color: '#ef4444' },
+            { label: 'Total Survei', value: stats.total, icon: <FileSpreadsheet />, color: 'var(--primary-light)', bg: 'rgba(99,102,241,0.1)' },
+            { label: 'Menunggu', value: stats.pending, icon: <Clock3 />, color: 'var(--warning)', bg: 'rgba(245,158,11,0.1)' },
+            { label: 'Disetujui', value: stats.approved, icon: <CheckCircle2 />, color: 'var(--success)', bg: 'rgba(16,185,129,0.1)' },
+            { label: 'Ditolak', value: stats.rejected, icon: <XCircle />, color: 'var(--danger)', bg: 'rgba(239,68,68,0.1)' },
           ].map((s, i) => (
-            <div key={i} className="stat-card">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 24 }}>{s.icon}</span>
-              </div>
-              <p style={{ fontSize: 32, fontWeight: 800, color: s.color }}>{s.value}</p>
+            <div key={i} className="stat-card card-premium">
+              <div className="stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
+              <p className="stat-value">{s.value}</p>
               <p className="stat-label">{s.label}</p>
             </div>
           ))}
@@ -470,39 +444,50 @@ export default function AdminPage() {
             <table>
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th style={{ paddingLeft: 20 }}>#</th>
                   <th>Surveyor</th>
                   <th>Pasar</th>
                   <th>Nominal</th>
                   <th>Status</th>
                   <th>Waktu</th>
+                  <th style={{ textAlign: 'right', paddingRight: 20 }}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {[...submissions]
                   .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                   .map((s, i) => (
-                  <tr key={s.id}>
-                    <td className="text-muted text-sm">{i + 1}</td>
+                  <tr key={s.id} className="hover:bg-white/5 transition-colors">
+                    <td className="text-muted text-sm" style={{ paddingLeft: 20 }}>{i + 1}</td>
                     <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.surveyor_name}</td>
                     <td className="text-secondary">
-                        <div style={{ fontWeight: 500 }}>{s.market_name}</div>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{s.location_type || 'Lapak'}</div>
+                        <div style={{ fontWeight: 700, color: 'var(--primary-light)' }}>{s.market_name}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.location_type || 'Lapak'}</div>
                     </td>
-                    <td style={{ color: '#10b981', fontWeight: 700 }}>
-                        <div>Rp {s.amount.toLocaleString('id')}</div>
+                    <td style={{ color: 'var(--success)', fontWeight: 800 }}>
+                        <div style={{ fontSize: 15 }}>Rp {s.amount.toLocaleString('id')}</div>
                         {s.drive_link && (
-                            <a href={s.drive_link} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--primary-light)' }}>
-                                📁 Drive
+                            <a href={s.drive_link} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--accent)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                                <ExternalLink size={10} /> DRIVE ARCHIVE
                             </a>
                         )}
                     </td>
-                    <td><span className={`badge badge-${s.status}`}>{
-                      s.status === 'pending' ? 'Menunggu' :
-                      s.status === 'approved' ? 'Disetujui' : 'Ditolak'
-                    }</span></td>
+                    <td>
+                      <span className={`badge badge-${s.status}`} style={{ fontWeight: 800 }}>
+                        {s.status.toUpperCase()}
+                      </span>
+                    </td>
                     <td className="text-sm text-muted">
                         {new Date(s.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td style={{ textAlign: 'right', paddingRight: 20 }}>
+                       <button 
+                         className="p-2 text-danger hover:bg-danger/10 rounded-lg transition-colors"
+                         onClick={() => handleDelete(s.id)}
+                         title="Hapus Permanen"
+                       >
+                         <Trash2 size={16} />
+                       </button>
                     </td>
                   </tr>
                 ))}

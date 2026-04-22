@@ -15,12 +15,17 @@ export async function GET(req: NextRequest) {
     );
 
     // 1. Cari data yang sudah 'approved' dan sudah punya 'drive_link'
-    // Kita juga bisa membatasi hanya data yang lebih tua dari 1 hari jika ingin lebih aman
+    // Otomatis: Hanya data yang lebih tua dari 7 hari (Weekly Cleanup)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
     const { data: approvedSubs, error: fetchError } = await supabaseAdmin
       .from('submissions')
       .select('id, photo_url')
       .eq('status', 'approved')
-      .not('drive_link', 'is', null);
+      .not('drive_link', 'is', null)
+      .not('photo_url', 'is', null) // Hanya yang masih punya foto
+      .lt('created_at', sevenDaysAgo.toISOString());
 
     if (fetchError) throw fetchError;
     if (!approvedSubs || approvedSubs.length === 0) {

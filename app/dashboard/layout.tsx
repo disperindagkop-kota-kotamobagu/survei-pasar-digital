@@ -73,72 +73,74 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Sidebar */}
-      <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+      <aside className={`sidebar ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="sidebar-logo">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              width: 36, height: 36, borderRadius: 10,
+              width: 40, height: 40, borderRadius: 12,
               background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              boxShadow: '0 8px 16px rgba(99, 102, 241, 0.2)'
             }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
                 <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
               </svg>
             </div>
             <div>
               <p className="logo-title">Survei Pasar</p>
-              <p className="logo-sub">KTG — v1.0</p>
+              <p className="logo-sub">KTG — Digital Recap</p>
             </div>
           </div>
-          {/* Sync Status */}
-          <div style={{ marginTop: 12 }}>
-            <div className={`sync-bar ${isOnline ? 'online' : 'offline'}`}>
+          {/* Sync Status Indicator */}
+          <div style={{ marginTop: 16 }}>
+            <div className={`sync-bar ${isOnline ? 'online' : 'offline'}`} style={{ borderRadius: 12 }}>
               <div className="sync-dot" />
-              <span>{isOnline ? 'Online — Tersinkron' : 'Offline — Menyimpan Lokal'}</span>
-              {pendingCount > 0 && !isOnline && (
-                <span style={{
-                  marginLeft: 'auto',
-                  background: 'rgba(245,158,11,0.2)',
-                  color: '#fbbf24', fontSize: 10,
-                  padding: '2px 6px', borderRadius: 20, fontWeight: 700,
+              <span style={{ fontSize: 11, fontWeight: 700 }}>{isOnline ? 'Sistem Terhubung' : 'Mode Offline Aktif'}</span>
+              {pendingCount > 0 && (
+                <span className="badge-warning" style={{
+                  marginLeft: 'auto', padding: '2px 6px', borderRadius: 6, fontSize: 10, fontWeight: 800
                 }}>
-                  {pendingCount} pending
+                  {pendingCount}
                 </span>
               )}
             </div>
           </div>
         </div>
 
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav custom-scrollbar">
           <p className="nav-section-title">Menu Utama</p>
           {navItems.map(item => (
             <button
               key={item.href}
-              className={`nav-item${pathname === item.href ? ' active' : ''}`}
+              className={`nav-item ${pathname === item.href ? 'active' : ''}`}
               onClick={() => { router.push(item.href); setSidebarOpen(false); }}
             >
               <item.icon />
-              {item.label}
+              <span>{item.label}</span>
+              {pathname === item.href && (
+                <div style={{ marginLeft: 'auto', width: 4, height: 4, borderRadius: '50%', background: 'currentColor' }} />
+              )}
             </button>
           ))}
-          <div style={{ margin: '12px 0', borderTop: '1px solid var(--border)' }} />
-          <p className="nav-section-title">Akun</p>
-          <button className="nav-item" onClick={handleLogout}>
+          
+          <div style={{ margin: '16px 0', height: 1, background: 'var(--border)' }} />
+          <p className="nav-section-title">Pengaturan Akun</p>
+          <button className="nav-item text-danger" onClick={handleLogout} style={{ color: 'var(--danger)' }}>
             <LogoutIcon />
-            Keluar
+            <span>Keluar Sesi</span>
           </button>
         </nav>
 
         <div className="sidebar-footer">
-          <div className="user-card">
-            <div className="user-avatar">
+          <div className="user-card glass">
+            <div className="user-avatar" style={{ border: '2px solid rgba(255,255,255,0.1)' }}>
               {(user.full_name || 'U').charAt(0).toUpperCase()}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p className="user-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.full_name || 'User'}
+                {user.full_name || 'User Name'}
               </p>
-              <span className="user-role">{user.role}</span>
+              <span className="user-role" style={{ fontSize: 9 }}>{user.role}</span>
             </div>
           </div>
         </div>
