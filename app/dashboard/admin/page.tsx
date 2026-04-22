@@ -36,7 +36,7 @@ export default function AdminPage() {
   const [cleaning, setCleaning] = useState(false);
   const [syncProgress, setSyncProgress] = useState<string>('');
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
-  const [proxyUrl] = useState<string>(process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL || '');
+  const [proxyUrl] = useState<string>(process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzw523Z8WMOLes_oZZNHIWGYHGQJ2DFTGB3-o2zC4Z2-cGRdo5IywvYlxGJXYulff2L/exec');
   const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'markets'>('overview');
   const [timeFilter, setTimeFilter] = useState<'day' | 'week' | 'month' | 'all'>('all');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);

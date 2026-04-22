@@ -6,7 +6,7 @@ import ModernModal from '@/components/ModernModal';
 
 export default function CheckerPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [proxyUrl] = useState<string>(process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL || '');
+  const [proxyUrl] = useState<string>(process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzw523Z8WMOLes_oZZNHIWGYHGQJ2DFTGB3-o2zC4Z2-cGRdo5IywvYlxGJXYulff2L/exec');
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
