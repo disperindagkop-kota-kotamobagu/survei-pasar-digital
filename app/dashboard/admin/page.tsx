@@ -281,8 +281,10 @@ export default function AdminPage() {
       } else {
         for (let i = 0; i < toSync.length; i++) {
           const sub = toSync[i];
+          const hasPhoto = sub.photo_url && sub.photo_url !== '';
+          
           setSyncProgress(`Memproses ${i + 1}/${toSync.length}: ${sub.market_name}...`);
-          setSyncLogs(prev => [...prev, `[PROCESSING] Data ${i + 1}: ${sub.market_name} (ID: ${sub.id.slice(-5)})`]);
+          setSyncLogs(prev => [...prev, `[PROCESSING] ${hasPhoto ? '📸' : '📄'} Data ${i + 1}: ${sub.market_name} (ID: ${sub.id.slice(-5)})`]);
           
           const recapRes = await fetch('/api/recap', {
             method: 'POST',
@@ -293,17 +295,13 @@ export default function AdminPage() {
           const resData = await recapRes.json();
           if (!recapRes.ok) {
             setSyncLogs(prev => [...prev, `[ERROR] Gagal pada Fase ${resData.phase || 'UNKNOWN'}: ${resData.error}`]);
-            setSyncLogs(prev => [...prev, `[TIP] Pastikan email ${resData.serviceEmail} sudah jadi Editor di Drive & SHEETS (ID: ${resData.sheetId}).`]);
             throw new Error(`Data ${i + 1} gagal: ${resData.error}`);
           }
           
           if (resData.driveLink === '-') {
-             setSyncLogs(prev => [...prev, `[SUCCESS] Data ${i + 1} terkirim ke Sheets (Foto Lewat).`]);
+             setSyncLogs(prev => [...prev, `[INFO] Data ${i + 1} terkirim ke Sheets (Tanpa Foto).`]);
           } else {
              setSyncLogs(prev => [...prev, `[SUCCESS] Data ${i + 1} terkirim ke Drive & Sheets.`]);
-             if (i === 0 && resData.folderId) {
-               setSyncLogs(prev => [...prev, `[INFO] Folder Target: https://drive.google.com/drive/folders/${resData.folderId}`]);
-             }
           }
         }
       }

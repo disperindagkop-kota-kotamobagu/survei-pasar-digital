@@ -35,17 +35,18 @@ export async function GET(req: NextRequest) {
     // 2. Loop dan hapus file dari Storage
     for (const sub of approvedSubs) {
       try {
-        if (!sub.photo_url) continue;
+        // Ambil path lengkap SETELAH /public/submissions/
+        // Contoh URL: https://.../storage/v1/object/public/submissions/USER_ID/TEMP_ID.jpg
+        // Kita butuh: "USER_ID/TEMP_ID.jpg"
+        const parts = sub.photo_url.split('/public/submissions/');
+        const fullPath = parts.length > 1 ? parts[1] : null;
 
-        // Ambil nama file dari URL (biasanya di akhir setelah /public/submissions/)
-        // Contoh URL: https://.../storage/v1/object/public/submissions/20260421_Pasar_Lapak_uuid.jpg
-        const fileName = sub.photo_url.split('/').pop();
-
-        if (fileName) {
+        if (fullPath) {
+          console.log(`[CLEANUP] Deleting from Supabase: ${fullPath}`);
           const { error: deleteError } = await supabaseAdmin
             .storage
             .from('submissions')
-            .remove([fileName]);
+            .remove([fullPath]);
 
           if (deleteError) {
             console.error(`Gagal hapus file ${fileName}:`, deleteError.message);

@@ -101,36 +101,33 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
-    let finalPhotoLink = '-';
-
-    // 2. Upload to Google Drive (Sekarang mendukung Proxy Apps Script untuk memintas kuota 0GB)
-    if (photo_base64 || photo_url) {
+    // 2. Upload to Google Drive
+    if (photo_base64 || (photo_url && photo_url !== '-')) {
       try {
         const fileDatePrefix = now.toISOString().slice(0, 10).replace(/-/g, '');
-        const fileName = `${fileDatePrefix}_${market_name}_${body.location_type || 'Lapak'}_${id}.jpg`;
-        // Gunakan proxyUrl terdeteksi (body -> Sheets Config -> Env)
+        const fileName = `${fileDatePrefix}_${market_name.replace(/\s+/g, '_')}_${(body.location_type || 'Lapak').replace(/\s+/g, '_')}_${id}.jpg`;
         const proxyUrl = finalProxyUrl;
 
         if (!proxyUrl) {
-          throw new Error('Konfigurasi URL Proxy tidak ditemukan. Silakan klik tombol Simpan (Ikon Disket) di Dashboard.');
+          throw new Error('Konfigurasi URL Proxy tidak ditemukan.');
         }
 
-        // JALUR PROXY (Wajib untuk Akun Personal)
         let finalBase64 = photo_base64;
         
-        if (!finalBase64 && photo_url) {
-          // Konversi URL ke Base64 agar Proxy bisa memprosesnya
+        if (!finalBase64 && photo_url && photo_url.startsWith('http')) {
           try {
+            console.log(`[RECAP] Downloading photo from Supabase: ${photo_url}`);
             const resp = await fetch(photo_url);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const arrayBuffer = await resp.arrayBuffer();
             finalBase64 = Buffer.from(arrayBuffer).toString('base64');
           } catch (fetchErr: any) {
-            throw new Error(`Gagal download dari Supabase: ${fetchErr.message}. Pastikan Foto ada di Bucket.`);
+            throw new Error(`Gagal download dari Supabase: ${fetchErr.message}`);
           }
         }
 
         if (finalBase64) {
+          console.log(`[RECAP] Sending photo to Google Proxy: ${fileName}`);
           const proxyRes = await fetch(proxyUrl, {
             method: 'POST',
             body: JSON.stringify({
@@ -140,19 +137,21 @@ export async function POST(req: NextRequest) {
             })
           });
           
-          if (!proxyRes.ok) throw new Error(`Proxy melapor error HTTP ${proxyRes.status}`);
+          if (!proxyRes.ok) throw new Error(`Proxy Apps Script error HTTP ${proxyRes.status}`);
           
           const proxyData = await proxyRes.json();
           if (proxyData.success) {
             finalPhotoLink = proxyData.webViewLink;
+            console.log(`[RECAP] Success! Drive Link: ${finalPhotoLink}`);
           } else {
-            throw new Error(`Proxy Gagal: ${proxyData.error}`);
+            throw new Error(`Proxy Apps Script Gagal: ${proxyData.error}`);
           }
         } else {
-          throw new Error('Data foto (Base64/URL) tidak ditemukan dalam request.');
+          console.log(`[RECAP] Photo URL present but could not be converted to Base64.`);
+          finalPhotoLink = '-';
         }
       } catch (uploadErr: any) {
-        // Robot Jujur: Jika foto gagal, sampaikan SEBAGAI ERROR
+        console.error(`[RECAP] Drive Upload Error: ${uploadErr.message}`);
         return NextResponse.json({ 
           success: false, 
           error: `Gagal kirim foto ke Drive: ${uploadErr.message}`, 
@@ -160,6 +159,9 @@ export async function POST(req: NextRequest) {
           serviceEmail 
         }, { status: 500 });
       }
+    } else {
+      console.log(`[RECAP] No photo detected (photo_base64 and photo_url are empty)`);
+      finalPhotoLink = '-';
     }
 
     // 2.5. Update Supabase

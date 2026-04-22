@@ -34,11 +34,12 @@ export async function syncSubmissions() {
           throw new Error(`Gagal Upload Foto: ${uploadError.message}`);
         }
         
-        const { data: publicUrl } = supabase.storage
+        const { data: publicUrlData } = supabase.storage
           .from('submissions')
           .getPublicUrl(fileName);
         
-        photoUrl = publicUrl.publicUrl;
+        photoUrl = publicUrlData.publicUrl;
+        console.log(`[SYNC] Photo URL generated: ${photoUrl}`);
       }
 
       // 2. Upsert ke tabel submissions (menggunakan id/tempId sebagai primary key)
@@ -46,11 +47,11 @@ export async function syncSubmissions() {
         .from('submissions')
         .upsert({
           id: item.tempId,
-          surveyor_id: user.id, // Paksa gunakan ID user yang aktif sekarang
+          surveyor_id: user.id, 
           market_id: item.market_id,
           amount: item.amount,
           location_type: item.location_type || 'lapak',
-          photo_url: photoUrl || undefined, 
+          photo_url: photoUrl || null, 
           notes: item.notes,
           location_lat: item.lat,
           location_long: item.long,
