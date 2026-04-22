@@ -65,6 +65,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       { href: '/dashboard/markets', label: 'Kelola Pasar', icon: MapIcon },
       { href: '/dashboard/users', label: 'Manajemen User', icon: UsersIcon },
     ] : []),
+    { href: '/dashboard/profile', label: 'Profil Saya', icon: User },
   ];
 
   const handleLogout = () => { logout(); router.push('/login'); };
@@ -151,7 +152,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             </div>
             <button 
               className="btn-icon-sm" 
-              onClick={() => { setEditName(user.full_name); setIsProfileModalOpen(true); }}
+              onClick={() => { router.push('/dashboard/profile'); setSidebarOpen(false); }}
               title="Edit Profil"
               style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 6, borderRadius: 8 }}
             >
@@ -166,37 +167,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Profile Modal */}
-      <ModernModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        title="Edit Profil Saya"
-        description="Perbarui informasi identitas Anda di sistem."
-        confirmText="Simpan Perubahan"
-        onConfirm={async () => {
-          setSavingProfile(true);
-          const res = await updateProfile({ full_name: editName });
-          setSavingProfile(false);
-          if (res.error) {
-            setProfileError(res.error);
-          } else {
-            setIsProfileModalOpen(false);
-          }
-        }}
-        loading={savingProfile}
-      >
-        <div className="form-group" style={{ marginTop: 12 }}>
-          <label className="form-label">Nama Lengkap</label>
-          <input 
-            type="text" 
-            className="form-input" 
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            placeholder="Masukkan nama lengkap..."
-            autoFocus
-          />
-        </div>
-      </ModernModal>
 
       {profileError && (
         <ModernModal
