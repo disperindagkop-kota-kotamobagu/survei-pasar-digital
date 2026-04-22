@@ -61,6 +61,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ] : []),
     ...(role === 'admin' ? [
       { href: '/dashboard/admin', label: 'Dashboard Admin', icon: ChartIcon },
+      { href: '/dashboard/checker', label: 'Validasi Harga', icon: CheckIcon },
       { href: '/dashboard/markets', label: 'Kelola Pasar', icon: MapIcon },
       { href: '/dashboard/users', label: 'Manajemen User', icon: UsersIcon },
     ] : []),

@@ -283,7 +283,7 @@ export default function AdminPage() {
 
       <div className="page-body">
         {/* Stats Grid */}
-        <div className="grid-4 mb-8">
+        <div className="grid-4 mb-12">
           {[
             { label: 'Total Survei', value: stats.total, icon: <FileSpreadsheet />, color: 'var(--primary-light)', bg: 'rgba(99,102,241,0.1)' },
             { label: 'Menunggu', value: stats.pending, icon: <Clock3 />, color: 'var(--warning)', bg: 'rgba(245,158,11,0.1)' },
