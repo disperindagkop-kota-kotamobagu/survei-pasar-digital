@@ -475,6 +475,7 @@ export default function SurveyPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {/* Step 1: Pilih Pasar */}
               <div className="card">
+                <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                   {editId ? (
                     <span style={{ color: 'var(--warning)', textTransform: 'uppercase' }}>MODE EDIT</span>
                   ) : (
