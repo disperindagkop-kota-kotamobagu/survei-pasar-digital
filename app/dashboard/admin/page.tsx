@@ -296,7 +296,15 @@ export default function AdminPage() {
             setSyncLogs(prev => [...prev, `[TIP] Pastikan email ${resData.serviceEmail} sudah jadi Editor di Drive & SHEETS (ID: ${resData.sheetId}).`]);
             throw new Error(`Data ${i + 1} gagal: ${resData.error}`);
           }
-          setSyncLogs(prev => [...prev, `[SUCCESS] Data ${i + 1} terkirim ke Drive & Sheets.`]);
+          
+          if (resData.driveLink === '-') {
+             setSyncLogs(prev => [...prev, `[SUCCESS] Data ${i + 1} terkirim ke Sheets (Foto Lewat).`]);
+          } else {
+             setSyncLogs(prev => [...prev, `[SUCCESS] Data ${i + 1} terkirim ke Drive & Sheets.`]);
+             if (i === 0 && resData.folderId) {
+               setSyncLogs(prev => [...prev, `[INFO] Folder Target: https://drive.google.com/drive/folders/${resData.folderId}`]);
+             }
+          }
         }
       }
 

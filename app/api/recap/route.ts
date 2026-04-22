@@ -176,10 +176,11 @@ export async function POST(req: NextRequest) {
     const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     await supabaseAdmin.from('submissions').update({ drive_link: finalPhotoLink }).eq('id', id);
 
-    // 3. Multi-Tab Google Sheets Recap
+    // 3. Multi-Tab Google Sheets Recap (DIPINDAH KE SINI AGAR LINK FOTO ADA)
     const fullDate = now.toLocaleString('id-ID');
+    // Kolom H (ke-8) adalah ID Unik untuk pencegahan duplikat
     const values = [
-      [fullDate, surveyor_name, market_name, body.location_type || 'Lapak', amount, finalPhotoLink, notes || '-']
+      [fullDate, surveyor_name, market_name, body.location_type || 'Lapak', amount, finalPhotoLink, notes || '-', id]
     ];
 
     // FITUR: Simpan Konfigurasi ke Sheets
@@ -200,7 +201,12 @@ export async function POST(req: NextRequest) {
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: [[body.proxyUrl]] },
         });
-        return NextResponse.json({ success: true, message: 'Konfigurasi tersimpan di Cloud!' });
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Sync Berhasil', 
+          driveLink: finalPhotoLink, 
+          folderId: maskedFolderId 
+        });
       } catch (e: any) {
         return NextResponse.json({ success: false, error: 'Gagal simpan konfigurasi: ' + e.message }, { status: 500 });
       }
@@ -209,8 +215,24 @@ export async function POST(req: NextRequest) {
     // Helper to append and ensure tab
     const appendToSheet = async (title: string) => {
       try {
-        const range = `'${title}'!A:G`;
-        // Try to append. If fails (likely sheet not found), create it.
+        const range = `'${title}'!A:H`;
+
+        // 1. CEK DUPLIKAT: Cari ID di Kolom H
+        try {
+          const checkRes = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: `'${title}'!H:H`,
+          });
+          const existingIds = (checkRes.data.values || []).map(row => row[0]);
+          if (existingIds.includes(id)) {
+            console.log(`[SKIP] Data ${id} sudah ada di tab ${title}`);
+            return;
+          }
+        } catch (e) {
+          // Abaikan error jika range tidak ditemukan (berarti tab baru)
+        }
+
+        // 2. Tambah Data (Append)
         await sheets.spreadsheets.values.append({
           spreadsheetId,
           range,
@@ -230,17 +252,17 @@ export async function POST(req: NextRequest) {
               requests: [{ addSheet: { properties: { title } } }]
             }
           });
-          // Add Header
+          // Add Header (8 Kolom)
           await sheets.spreadsheets.values.update({
             spreadsheetId,
-            range: `'${title}'!A1:G1`,
+            range: `'${title}'!A1:H1`,
             valueInputOption: 'USER_ENTERED',
-            requestBody: { values: [['Tanggal', 'Surveyor', 'Pasar', 'Tipe', 'Nominal', 'Foto', 'Catatan']] },
+            requestBody: { values: [['Tanggal', 'Surveyor', 'Pasar', 'Tipe', 'Nominal', 'Foto (Drive)', 'Catatan', 'ID Transaksi']] },
           });
           // Re-append
           await sheets.spreadsheets.values.append({
             spreadsheetId,
-            range: `'${title}'!A:G`,
+            range: `'${title}'!A:H`,
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: [values[0]] },
           });
