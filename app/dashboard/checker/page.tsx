@@ -179,7 +179,7 @@ export default function CheckerPage() {
           if (result.success) {
             showToast('success', '✅ ARSIP BERHASIL: Foto & Data terkirim ke Google Cloud!');
           } else {
-            showToast('danger', '⚠️ ARSIP GAGAL: Data tersimpan di DB tapi gagal ke Google. Silakan sinkron manual nanti.');
+            showToast('danger', `⚠️ ARSIP GAGAL: ${result.error || 'Gagal sinkron ke Google'}.`);
           }
         }
       } else {
