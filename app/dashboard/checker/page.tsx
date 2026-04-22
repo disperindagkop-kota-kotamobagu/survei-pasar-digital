@@ -5,6 +5,7 @@ import { Check, X, Camera, MapPin, Scan, Filter, Zap, Clock, Info } from 'lucide
 
 export default function CheckerPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [proxyUrl] = useState<string>(process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL || '');
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
@@ -101,7 +102,7 @@ export default function CheckerPage() {
           await fetch('/api/recap', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(sub),
+            body: JSON.stringify({ ...sub, proxyUrl }),
           });
           successCount++;
         }
@@ -156,7 +157,7 @@ export default function CheckerPage() {
           const res = await fetch('/api/recap', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(sub),
+            body: JSON.stringify({ ...sub, proxyUrl }),
           });
           const result = await res.json();
           if (result.success) {
@@ -229,30 +230,6 @@ export default function CheckerPage() {
       )}
 
       <div className="page-body">
-        {/* Info & Auto Approve Area */}
-        <div className="card mb-6" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.05), rgba(139,92,246,0.05))', border: '1px solid var(--primary-light)', padding: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                <Zap size={20} fill="white" />
-              </div>
-              <div>
-                <p style={{ fontWeight: 700, fontSize: 15 }}>Asisten Verifikasi Otomatis</p>
-                <p className="text-xs text-muted">Sistem mendeteksi {autoApprovableCount} data dengan GPS & OCR yang cocok sempurna.</p>
-              </div>
-            </div>
-            <button 
-              className="btn btn-primary" 
-              onClick={handleAutoApprove}
-              disabled={processing === 'auto' || autoApprovableCount === 0}
-              style={{ background: autoApprovableCount > 0 ? 'var(--primary)' : 'var(--border)', minWidth: 160 }}
-            >
-              {processing === 'auto' ? <span className="spinner" /> : <Check size={16} strokeWidth={3} style={{ marginRight: 8 }} />}
-              Setujui {autoApprovableCount} Data
-            </button>
-          </div>
-        </div>
-
         {/* Auto Approve Area - Styled to fit fixed layout */}
         <div className="card mb-6" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.08))', border: '1px solid var(--primary-light)', padding: '16px 20px', borderRadius: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>

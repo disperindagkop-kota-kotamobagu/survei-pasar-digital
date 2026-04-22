@@ -34,12 +34,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [cleaning, setCleaning] = useState(false);
-  const [diagnosing, setDiagnosing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<string>('');
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
-  const [proxyUrl, setProxyUrl] = useState<string>(
-    typeof window !== 'undefined' ? localStorage.getItem('proxy_url') || '' : ''
-  );
+  const [proxyUrl] = useState<string>(process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL || '');
   const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'markets'>('overview');
   const [timeFilter, setTimeFilter] = useState<'day' | 'week' | 'month' | 'all'>('all');
 
@@ -196,62 +193,7 @@ export default function AdminPage() {
     setExporting(false);
   };
 
-  const handleDiagnostic = async () => {
-    setDiagnosing(true);
-    try {
-      const { supabase } = await import('@/lib/supabaseClient');
-      const { data: { user } } = await supabase.auth.getUser();
 
-      const res = await fetch('/api/recap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: 'test-diag-' + Date.now(),
-          amount: 0,
-          market_name: 'DIAGNOSTIK_TEST',
-          surveyor_name: user?.email || 'Admin-Test',
-          location_type: 'tes_foto',
-          photo_base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-          created_at: new Date().toISOString(),
-          notes: 'Testing connection & PHOTO UPLOAD from dashboard',
-          proxyUrl
-        }),
-      });
-
-      const result = await res.json();
-      if (result.success) {
-        alert(`✅ SEMUA KONEKSI BERHASIL!\n\nRobot: ${result.serviceEmail}\nFolder: ${result.folderId}\nSheet: ${result.sheetId}\n\nData test sudah masuk ke Drive & Sheets.`);
-      } else {
-        alert(`❌ KONEKSI GAGAL!\nFase: ${result.phase}\nError: ${result.error}\n\nRobot: ${result.serviceEmail || 'Tidak Terdeteksi'}\nSheet ID: ${result.sheetId || 'Tidak Terdeteksi'}\n\nSaran: Pastikan Robot di atas sudah menjadi EDITOR di file Google Sheets tersebut.`);
-      }
-    } catch (err: any) {
-      alert('❌ ERROR SISTEM: ' + err.message);
-    }
-    setDiagnosing(false);
-  };
-
-  const handleSaveConfig = async () => {
-    if (!proxyUrl) return alert('Silakan masukkan URL Proxy terlebih dahulu.');
-    setCleaning(true);
-    setSyncProgress('Menyimpan...');
-    try {
-      const res = await fetch('/api/recap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ saveConfig: true, proxyUrl }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert('✅ Tersimpan di Google Sheets! Kini sinkronisasi otomatis akan lancar.');
-      } else {
-        alert('❌ Gagal simpan: ' + data.error);
-      }
-    } catch (e: any) {
-      alert('❌ Error: ' + e.message);
-    }
-    setCleaning(false);
-    setSyncProgress('');
-  };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Hapus data survey ini secara permanen dari database & storage Supabase?')) return;
@@ -328,56 +270,6 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
-        <div className="flex-1 min-w-[300px] flex gap-2">
-          <input 
-            type="text" 
-            placeholder="Tempel URL Apps Script (Proxy) di sini..."
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-            value={proxyUrl}
-            onChange={(e) => {
-              setProxyUrl(e.target.value);
-              localStorage.setItem('proxy_url', e.target.value);
-            }}
-          />
-          <button
-            onClick={handleSaveConfig}
-            disabled={cleaning || !proxyUrl}
-            title="Simpan Konfigurasi ke Cloud (Google Sheets)"
-            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white transition-colors"
-          >
-            <Save className="w-4 h-4" />
-          </button>
-        </div>
-        <button
-          onClick={handleManualSyncAndCleanup}
-          disabled={cleaning || syncProgress.includes('...') || submissions.length === 0}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors text-white font-medium shadow-lg"
-        >
-          <RefreshCw className={`w-4 h-4 ${cleaning ? 'animate-spin' : ''}`} />
-          {cleaning ? syncProgress : 'Sync & Bersihkan'}
-        </button>
-        <button
-          onClick={handleDiagnostic}
-          disabled={diagnosing}
-          className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors text-white font-medium shadow-lg"
-        >
-          <Settings className="w-4 h-4" />
-          {diagnosing ? 'Mengetes...' : 'Cek Koneksi Google'}
-        </button>
-      </div>
-
-      {syncLogs.length > 0 && (
-        <div className="card mb-6" style={{ background: '#000', color: '#10b981', fontFamily: 'monospace', fontSize: 12, padding: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fff' }}>
-            <strong>Audit Log Sinkronisasi</strong>
-            <button onClick={() => setSyncLogs([])} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>Bersihkan</button>
-          </div>
-          <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-            {syncLogs.map((log, i) => <div key={i} style={{ marginBottom: 4 }}>{log}</div>)}
-          </div>
-        </div>
-      )}
 
       <div className="page-body">
         {/* Stats Grid */}

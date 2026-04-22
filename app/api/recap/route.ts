@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     const maskedSheetId = spreadsheetId ? `${spreadsheetId.slice(0, 4)}...${spreadsheetId.slice(-4)}` : 'TIDAK_ADA';
 
     // 1.7. AUTO-DETECT Proxy dari Sheets (untuk Cron Job & Manual Sync)
-    let finalProxyUrl = body.proxyUrl || process.env.GOOGLE_APPS_SCRIPT_URL;
+    let finalProxyUrl = body.proxyUrl || process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL || process.env.GOOGLE_APPS_SCRIPT_URL;
     if (!finalProxyUrl && spreadsheetId) {
       try {
         const configRes = await sheets.spreadsheets.values.get({
