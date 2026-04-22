@@ -178,14 +178,13 @@ export async function POST(req: NextRequest) {
       ? `https://www.google.com/maps?q=${location_lat},${location_long}`
       : '-';
     
-    // Kolom J (ke-10) adalah ID Unik untuk pencegahan duplikat
+    // Kolom I (ke-9) adalah ID Unik untuk pencegahan duplikat
     const values = [
       [
         fullDate, 
         surveyor_name, 
         market_name, 
         body.location_type || 'Lapak', 
-        'Rp', 
         amount, 
         finalPhotoLink, 
         notes || '-', 
@@ -248,7 +247,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Tulis data ke baris spesifik
-        const range = `'${title}'!A${nextRow}:J${nextRow}`;
+        const range = `'${title}'!A${nextRow}:I${nextRow}`;
         await sheets.spreadsheets.values.update({
           spreadsheetId,
           range,
@@ -270,13 +269,13 @@ export async function POST(req: NextRequest) {
           });
           await sheets.spreadsheets.values.update({
             spreadsheetId,
-            range: `'${title}'!A1:J1`,
+            range: `'${title}'!A1:I1`,
             valueInputOption: 'USER_ENTERED',
-            requestBody: { values: [['Tanggal (Waktu)', 'Surveyor', 'Pasar', 'Tipe', '#', 'Nominal', 'Foto (Drive)', 'Catatan/Keterangan', 'Lokasi (Maps)', 'ID Transaksi']] },
+            requestBody: { values: [['Tanggal (Waktu)', 'Surveyor', 'Pasar', 'Tipe', 'Nominal', 'Foto (Drive)', 'Catatan/Keterangan', 'Lokasi (Maps)', 'ID Transaksi']] },
           });
           await sheets.spreadsheets.values.update({
             spreadsheetId,
-            range: `'${title}'!A2:J2`,
+            range: `'${title}'!A2:I2`,
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: values },
           });
