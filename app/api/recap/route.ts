@@ -269,19 +269,7 @@ export async function POST(req: NextRequest) {
     };
 
     try {
-      // Calculate Week String (Monday Start)
-      const weekStart = new Date(now);
-      const day = weekStart.getDay() || 7; // Sunday=7
-      weekStart.setDate(weekStart.getDate() - day + 1);
-      const weekLabel = `Minggu-${weekStart.toISOString().slice(5, 10)}`;
-      const monthLabel = `Bulan-${now.toISOString().slice(0, 7)}`;
-
-      await Promise.all([
-        appendToSheet('Master'),
-        appendToSheet(`Harian-${dateStrOnly}`),
-        appendToSheet(`Mingguan-${weekLabel}`),
-        appendToSheet(`Bulanan-${monthLabel}`)
-      ]);
+      await appendToSheet('Master');
     } catch (sheetErr: any) {
       return NextResponse.json({ 
         success: false, 
