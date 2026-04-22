@@ -101,6 +101,8 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
+    let finalPhotoLink = '-';
+
     // 2. Upload to Google Drive
     if (photo_base64 || (photo_url && photo_url !== '-')) {
       try {
