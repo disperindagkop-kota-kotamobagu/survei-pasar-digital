@@ -10,7 +10,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showDemo, setShowDemo] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   React.useEffect(() => {
@@ -30,15 +29,6 @@ export default function LoginPage() {
     }
   };
 
-  const quickLogin = async (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setLoading(true);
-    setError('');
-    const result = await login(demoEmail, demoPass);
-    setLoading(false);
-    if (!result.error) router.push('/dashboard');
-  };
 
   return (
     <div className="login-page">
@@ -95,40 +85,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6">
-          <button
-            className="btn btn-ghost btn-full text-sm"
-            onClick={() => setShowDemo(!showDemo)}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
-            </svg>
-            {showDemo ? 'Sembunyikan' : 'Lihat'} Akun Demo
-          </button>
-
-          {showDemo && (
-            <div style={{marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px'}}>
-              {[
-                { label: '👤 Admin', email: 'admin@demo.com', color: '#6366f1' },
-                { label: '📋 Surveyor', email: 'surveyor@demo.com', color: '#10b981' },
-                { label: '✓ Checker', email: 'checker@demo.com', color: '#f59e0b' },
-              ].map(a => (
-                <button
-                  key={a.email}
-                  className="btn btn-secondary btn-sm"
-                  style={{ justifyContent: 'space-between', borderColor: a.color + '44' }}
-                  onClick={() => quickLogin(a.email, 'demo123')}
-                >
-                  <span>{a.label}</span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{a.email}</span>
-                </button>
-              ))}
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '4px' }}>
-                Password: <code style={{ color: 'var(--primary-light)' }}>demo123</code>
-              </p>
-            </div>
-          )}
-        </div>
 
         <p style={{ marginTop: '24px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
           Surveyor Pasar KTG v1.0 · Sistem Survei Kontribusi
