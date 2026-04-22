@@ -111,13 +111,23 @@ export async function POST(req: NextRequest) {
         // Gunakan proxyUrl terdeteksi (body -> Sheets Config -> Env)
         const proxyUrl = finalProxyUrl;
 
-        if (proxyUrl && photo_base64) {
+        if (proxyUrl && (photo_base64 || photo_url)) {
           // JALUR PROXY (Bypass Kuota 0GB)
+          let finalBase64 = photo_base64;
+          
+          if (!finalBase64 && photo_url) {
+            // Konversi URL ke Base64 agar Proxy bisa memprosesnya
+            const resp = await fetch(photo_url);
+            if (!resp.ok) throw new Error(`Gagal mendownload foto dari Supabase (HTTP ${resp.status})`);
+            const arrayBuffer = await resp.arrayBuffer();
+            finalBase64 = Buffer.from(arrayBuffer).toString('base64');
+          }
+
           const proxyRes = await fetch(proxyUrl, {
             method: 'POST',
             body: JSON.stringify({
               folderId: dateFolderId,
-              photo_base64: photo_base64,
+              photo_base64: finalBase64,
               fileName: fileName
             })
           });
@@ -128,7 +138,7 @@ export async function POST(req: NextRequest) {
             throw new Error(`Proxy Error: ${proxyData.error}`);
           }
         } else {
-          // JALUR STANDAR (Service Account)
+          // JALUR STANDAR (Service Account - Akan gagal jika file besar & akun personal)
           let media = {};
           if (photo_base64) {
             const buffer = Buffer.from(photo_base64, 'base64');
