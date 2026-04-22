@@ -174,9 +174,13 @@ export async function POST(req: NextRequest) {
 
     // 3. Multi-Tab Google Sheets Recap (DIPINDAH KE SINI AGAR LINK FOTO ADA)
     const fullDate = now.toLocaleString('id-ID');
-    // Kolom H (ke-8) adalah ID Unik untuk pencegahan duplikat
+    const mapsLink = location_lat && location_long 
+      ? `https://www.google.com/maps?q=${location_lat},${location_long}`
+      : '-';
+    
+    // Kolom I (ke-9) adalah ID Unik untuk pencegahan duplikat
     const values = [
-      [fullDate, surveyor_name, market_name, body.location_type || 'Lapak', amount, finalPhotoLink, notes || '-', id]
+      [fullDate, surveyor_name, market_name, body.location_type || 'Lapak', amount, finalPhotoLink, notes || '-', mapsLink, id]
     ];
 
     // FITUR: Simpan Konfigurasi ke Sheets
@@ -253,14 +257,14 @@ export async function POST(req: NextRequest) {
             spreadsheetId,
             range: `'${title}'!A1:H1`,
             valueInputOption: 'USER_ENTERED',
-            requestBody: { values: [['Tanggal', 'Surveyor', 'Pasar', 'Tipe', 'Nominal', 'Foto (Drive)', 'Catatan', 'ID Transaksi']] },
+            requestBody: { values: [['Tanggal', 'Surveyor', 'Pasar', 'Tipe', 'Nominal', 'Foto (Drive)', 'Catatan', 'Lokasi (Maps)', 'ID Transaksi']] },
           });
           // Re-append
           await sheets.spreadsheets.values.append({
             spreadsheetId,
-            range: `'${title}'!A:H`,
+            range: `'${title}'!A:I`,
             valueInputOption: 'USER_ENTERED',
-            requestBody: { values: [values[0]] },
+            requestBody: { values: [values] },
           });
         } else {
           throw err;
