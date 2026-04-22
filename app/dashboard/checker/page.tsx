@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Submission } from '@/lib/supabaseClient';
 import { Check, X, Camera, MapPin, Scan, Filter, Zap, Clock, Info } from 'lucide-react';
+import ModernModal from '@/components/ModernModal';
 
 export default function CheckerPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -10,6 +11,8 @@ export default function CheckerPage() {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'danger'; msg: string } | null>(null);
+  const [showAutoApproveConfirm, setShowAutoApproveConfirm] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSubmissions();
@@ -84,9 +87,16 @@ export default function CheckerPage() {
       showToast('danger', 'Tidak ada data valid yang memenuhi kriteria otomatis.');
       return;
     }
+    setShowAutoApproveConfirm(true);
+  };
 
-    if (!confirm(`Setujui otomatis ${qualifying.length} data yang valid?`)) return;
-
+  const executeAutoApprove = async () => {
+    const qualifying = submissions.filter(s => 
+      s.status === 'pending' && 
+      s.is_geofence_valid && 
+      s.ocr_amount_detect && Math.abs(s.ocr_amount_detect - s.amount) < 1
+    );
+    setShowAutoApproveConfirm(false);
     setProcessing('auto');
     let successCount = 0;
     
@@ -117,7 +127,13 @@ export default function CheckerPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Hapus data survey ini secara permanen?')) return;
+    setDeleteId(id);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
     setProcessing(id);
     try {
       const res = await fetch(`/api/submissions/${id}`, { method: 'DELETE' });
@@ -364,6 +380,26 @@ export default function CheckerPage() {
           </div>
         )}
       </div>
+
+      <ModernModal
+        isOpen={showAutoApproveConfirm}
+        onClose={() => setShowAutoApproveConfirm(false)}
+        title="Verifikasi Otomatis?"
+        description={`Apakah Anda yakin ingin menyetujui ${autoApprovableCount} data yang sudah valid secara otomatis? Data akan langsung terarsip ke Google Cloud.`}
+        type="confirm"
+        confirmText="Ya, Setujui Semua"
+        onConfirm={executeAutoApprove}
+      />
+
+      <ModernModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        title="Hapus Data?"
+        description="Data survei ini akan dihapus permanen dari sistem. Tindakan ini tidak dapat dibatalkan."
+        type="danger"
+        confirmText="Hapus Permanen"
+        onConfirm={executeDelete}
+      />
 
       {/* Lightbox */}
       {selectedPhoto && (

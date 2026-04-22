@@ -3,14 +3,20 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/lib/authContext';
 import { initBackgroundSync } from '@/lib/syncService';
+import ModernModal from '@/components/ModernModal';
+import { User, Settings, Save, X, Camera as CameraIcon, History as HistoryIcon, CheckCircle as CheckIcon, BarChart as ChartIcon, Map as MapIcon, Users as UsersIcon, LogOut as LogoutIcon } from 'lucide-react';
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, updateProfile } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     setIsOnline(navigator.onLine);
@@ -142,6 +148,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               </p>
               <span className="user-role" style={{ fontSize: 9 }}>{user.role}</span>
             </div>
+            <button 
+              className="btn-icon-sm" 
+              onClick={() => { setEditName(user.full_name); setIsProfileModalOpen(true); }}
+              title="Edit Profil"
+              style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 6, borderRadius: 8 }}
+            >
+              <Settings size={14} />
+            </button>
           </div>
         </div>
       </aside>
@@ -150,6 +164,50 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       <main className="main-content" style={{ overflowX: 'hidden' }}>
         {children}
       </main>
+
+      {/* Profile Modal */}
+      <ModernModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        title="Edit Profil Saya"
+        description="Perbarui informasi identitas Anda di sistem."
+        confirmText="Simpan Perubahan"
+        onConfirm={async () => {
+          setSavingProfile(true);
+          const res = await updateProfile({ full_name: editName });
+          setSavingProfile(false);
+          if (res.error) {
+            setProfileError(res.error);
+          } else {
+            setIsProfileModalOpen(false);
+          }
+        }}
+        loading={savingProfile}
+      >
+        <div className="form-group" style={{ marginTop: 12 }}>
+          <label className="form-label">Nama Lengkap</label>
+          <input 
+            type="text" 
+            className="form-input" 
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            placeholder="Masukkan nama lengkap..."
+            autoFocus
+          />
+        </div>
+      </ModernModal>
+
+      {profileError && (
+        <ModernModal
+          isOpen={!!profileError}
+          onClose={() => setProfileError(null)}
+          title="Gagal Perbarui Profil"
+          description={profileError}
+          type="danger"
+          confirmText="Tutup"
+          onConfirm={() => setProfileError(null)}
+        />
+      )}
 
       {/* Mobile toggle */}
       <button 

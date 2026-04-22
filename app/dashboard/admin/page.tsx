@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { DEMO_SUBMISSIONS, DEMO_MARKETS } from '@/lib/mockData';
 import { Submission } from '@/lib/supabaseClient';
+import ModernModal from '@/components/ModernModal';
 
 export default function AdminPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -39,6 +40,9 @@ export default function AdminPage() {
   const [proxyUrl] = useState<string>(process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL || '');
   const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'markets'>('overview');
   const [timeFilter, setTimeFilter] = useState<'day' | 'week' | 'month' | 'all'>('all');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
+  const [resultModal, setResultModal] = useState<{ title: string, msg: string, type: 'success' | 'danger' } | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -196,7 +200,13 @@ export default function AdminPage() {
 
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Hapus data survey ini secara permanen dari database & storage Supabase?')) return;
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmId) return;
+    const id = deleteConfirmId;
+    setDeleteConfirmId(null);
     setCleaning(true);
     try {
       const res = await fetch(`/api/submissions/${id}`, { method: 'DELETE' });
@@ -214,7 +224,11 @@ export default function AdminPage() {
   };
 
   const handleManualSyncAndCleanup = async () => {
-    if (!confirm('Jalankan pembersihan rutin? Data Approved yang sudah punya link arsip (G-Drive) akan dihapus fotonya dari Supabase.')) return;
+    setShowCleanupConfirm(true);
+  };
+
+  const executeCleanup = async () => {
+    setShowCleanupConfirm(false);
     
     setCleaning(true);
     setSyncProgress('Membersihkan...');
@@ -226,8 +240,10 @@ export default function AdminPage() {
       
       if (cleanupResult.success) {
         setSyncLogs(prev => [...prev, `[DONE] ${cleanupResult.message}`]);
+        setResultModal({ title: 'Pembersihan Selesai', msg: cleanupResult.message, type: 'success' });
       } else {
         setSyncLogs(prev => [...prev, `[ERROR] ${cleanupResult.error || 'Gagal membersihkan'}`]);
+        setResultModal({ title: 'Gagal', msg: cleanupResult.error || 'Terjadi kesalahan', type: 'danger' });
       }
       
       fetchData(); // Refresh UI
@@ -505,6 +521,39 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      {/* Modern Modals Implementation */}
+      <ModernModal 
+        isOpen={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        title="Hapus Data Permanen?"
+        description="Tindakan ini tidak dapat dibatalkan. Foto di storage dan data di database akan dihapus selamanya."
+        type="danger"
+        confirmText="Ya, Hapus Data"
+        onConfirm={confirmDelete}
+      />
+
+      <ModernModal
+        isOpen={showCleanupConfirm}
+        onClose={() => setShowCleanupConfirm(false)}
+        title="Jalankan Pembersihan Rutin?"
+        description="Sistem akan menghapus foto dari Supabase untuk data yang sudah aman terarsip di Google Drive demi menghemat kuota."
+        type="confirm"
+        confirmText="Mulai Pembersihan"
+        onConfirm={executeCleanup}
+      />
+
+      {resultModal && (
+        <ModernModal
+          isOpen={!!resultModal}
+          onClose={() => setResultModal(null)}
+          title={resultModal.title}
+          description={resultModal.msg}
+          type={resultModal.type}
+          confirmText="Tutup"
+          onConfirm={() => setResultModal(null)}
+        />
+      )}
     </>
   );
 }

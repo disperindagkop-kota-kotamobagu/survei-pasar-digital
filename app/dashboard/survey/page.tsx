@@ -5,6 +5,8 @@ import { DEMO_MARKETS } from '@/lib/mockData';
 import { haversineDistance, getUserLocation } from '@/lib/geofence';
 import { compressImage, blobToBase64, formatFileSize } from '@/lib/imageCompressor';
 import { addPendingSubmission } from '@/lib/dexieDb';
+import ModernModal from '@/components/ModernModal';
+import { Camera, MapPin, CheckCircle2, Save, ShoppingBag, Clock, Check, X, AlertCircle, Info, RefreshCw } from 'lucide-react';
 
 type GeofenceStatus = 'idle' | 'checking' | 'valid' | 'invalid' | 'error';
 type OCRStatus = 'idle' | 'loading' | 'done' | 'error';
@@ -76,6 +78,9 @@ export default function SurveyPage() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [editingTempId, setEditingTempId] = useState<string | null>(null);
+  const [modalMsg, setModalMsg] = useState<{ title: string; msg: string; type: 'success' | 'danger' | 'info' } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
   useEffect(() => {
     fetchCombinedHistory();
@@ -140,7 +145,7 @@ export default function SurveyPage() {
 
   const handleEdit = (item: any) => {
     if (item.synced && item.status && item.status !== 'pending') {
-      alert('Data sudah disah-kan dan tidak bisa diedit lagi.');
+      setModalMsg({ title: 'Tidak Bisa Diedit', msg: 'Data sudah disah-kan dan tidak bisa diedit lagi.', type: 'info' });
       return;
     }
     setEditId(item.id);
@@ -183,7 +188,13 @@ export default function SurveyPage() {
 
 
   const handleDelete = async (item: any) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus data ini?')) return;
+    setDeleteTarget(item);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const item = deleteTarget;
+    setDeleteTarget(null);
     
     try {
       if (item.fromServer) {
@@ -200,7 +211,7 @@ export default function SurveyPage() {
       setSaveResult({ type: 'success', msg: 'Data berhasil dihapus.' });
       fetchCombinedHistory();
     } catch (err: any) {
-      alert('Gagal menghapus: ' + err.message);
+      setModalMsg({ title: 'Gagal Menghapus', msg: err.message, type: 'danger' });
     }
   };
 
@@ -224,7 +235,7 @@ export default function SurveyPage() {
         }
       }, 100);
     } catch {
-      alert('Kamera tidak dapat diakses. Pastikan izin kamera diaktifkan.');
+      setModalMsg({ title: 'Akses Kamera Gagal', msg: 'Kamera tidak dapat diakses. Pastikan izin kamera diaktifkan di browser Anda.', type: 'danger' });
     }
   }, []);
 
@@ -403,9 +414,9 @@ export default function SurveyPage() {
           syncSubmissions().then(() => fetchCombinedHistory());
         });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Save error:', err);
-      setSaveResult({ type: 'error', msg: 'Gagal menyimpan data ke database lokal.' });
+      setModalMsg({ title: 'Gagal Menyimpan', msg: 'Gagal menyimpan data ke database lokal: ' + err.message, type: 'danger' });
     }
     setSaving(false);
   };
@@ -935,6 +946,43 @@ export default function SurveyPage() {
           </div>
         </div>
       </div>
+
+      {/* Modern Modals Implementation */}
+      <ModernModal
+        isOpen={showSubmitConfirm}
+        onClose={() => setShowSubmitConfirm(false)}
+        title="Simpan Data Survei?"
+        description="Data akan disimpan di memori HP dan otomatis dikirim ke server saat Anda online."
+        confirmText="Ya, Simpan"
+        onConfirm={() => {
+          setShowSubmitConfirm(false);
+          // Trigger the actual save logic
+          const form = document.querySelector('form');
+          if (form) form.requestSubmit();
+        }}
+      />
+
+      <ModernModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Hapus Data Survei?"
+        description="Data ini akan dihapus permanen dari riwayat Anda."
+        type="danger"
+        confirmText="Ya, Hapus"
+        onConfirm={confirmDelete}
+      />
+
+      {modalMsg && (
+        <ModernModal
+          isOpen={!!modalMsg}
+          onClose={() => setModalMsg(null)}
+          title={modalMsg.title}
+          description={modalMsg.msg}
+          type={modalMsg.type}
+          confirmText="Tutup"
+          onConfirm={() => setModalMsg(null)}
+        />
+      )}
 
       {/* Modern Sync Modal */}
       {syncModal.show && (

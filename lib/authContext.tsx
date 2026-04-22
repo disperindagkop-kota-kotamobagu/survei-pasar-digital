@@ -9,6 +9,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<{ error?: string }>;
   logout: () => void;
+  updateProfile: (newData: Partial<Profile>) => Promise<{ error?: string }>;
   isDemo: boolean;
 }
 
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   login: async () => ({}),
   logout: () => {},
+  updateProfile: async () => ({}),
   isDemo: true,
 });
 
@@ -96,8 +98,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(SESSION_KEY);
   }, []);
 
+  const updateProfile = useCallback(async (newData: Partial<Profile>) => {
+    if (!user) return { error: 'Sesi tidak ditemukan.' };
+    
+    // Update local state first for instant feedback (Optimistic Update)
+    const updatedUser = { ...user, ...newData };
+    setUser(updatedUser);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(updatedUser));
+
+    // Update Supabase if not in demo mode
+    if (
+      process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')
+    ) {
+      try {
+        const { supabase } = await import('./supabaseClient');
+        const { error } = await supabase
+          .from('profiles')
+          .update(newData)
+          .eq('id', user.id);
+        
+        if (error) {
+          console.error('Supabase Profile Update Error:', error);
+          // Rollback if failed
+          setUser(user);
+          localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+          return { error: 'Gagal memperbarui profil di server: ' + error.message };
+        }
+      } catch (e: any) {
+        return { error: 'Koneksi gagal: ' + e.message };
+      }
+    }
+    return {};
+  }, [user]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isDemo: true }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateProfile, isDemo: true }}>
       {children}
     </AuthContext.Provider>
   );
