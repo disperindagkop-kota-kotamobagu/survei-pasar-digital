@@ -226,39 +226,28 @@ export async function POST(req: NextRequest) {
     // Helper to append and ensure tab
     const appendToSheet = async (title: string) => {
       try {
-        const range = `'${title}'!A:H`;
-
-        // 1. CEK DUPLIKAT: Cari ID di Kolom H
-        try {
-          const checkRes = await sheets.spreadsheets.values.get({
-            spreadsheetId,
-            range: `'${title}'!H:H`,
-          });
-          const existingIds = (checkRes.data.values || []).map(row => row[0]);
         // 1. Ambil data saat ini untuk mencari baris kosong pertama
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: `'${title}'!A1:A100`, // Cek 100 baris pertama
+          range: `'${title}'!A1:A100`, 
         });
         
-        let nextRow = 2; // Mulai dari baris 2 (di bawah header)
+        let nextRow = 2; 
         if (response.data.values) {
-          // Cari baris pertama yang kolom A-nya kosong
           const rows = response.data.values;
           for (let i = 1; i < rows.length; i++) {
-            if (!rows[i][0]) {
+            if (!rows[i] || !rows[i][0]) {
               nextRow = i + 1;
               break;
             }
             if (i === rows.length - 1) nextRow = rows.length + 1;
           }
-          // Jika penuh sampai baris 100, lanjut ke baris berikutnya
           if (nextRow === 2 && rows.length > 1 && rows[1][0]) {
             nextRow = rows.length + 1;
           }
         }
 
-        // 2. Tulis data ke baris spesifik tersebut agar masuk ke dalam Tabel
+        // 2. Tulis data ke baris spesifik
         const range = `'${title}'!A${nextRow}:J${nextRow}`;
         await sheets.spreadsheets.values.update({
           spreadsheetId,
@@ -273,21 +262,18 @@ export async function POST(req: NextRequest) {
           err.message.includes('Requested entity was not found');
           
         if (isMissingSheet) {
-          // Create Sheet
           await sheets.spreadsheets.batchUpdate({
             spreadsheetId,
             requestBody: {
               requests: [{ addSheet: { properties: { title } } }]
             }
           });
-          // Add Header (10 Kolom) - Mengikuti screenshot user
           await sheets.spreadsheets.values.update({
             spreadsheetId,
             range: `'${title}'!A1:J1`,
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: [['Tanggal (Waktu)', 'Surveyor', 'Pasar', 'Tipe', '#', 'Nominal', 'Foto (Drive)', 'Catatan/Keterangan', 'Lokasi (Maps)', 'ID Transaksi']] },
           });
-          // Tulis data ke baris ke-2
           await sheets.spreadsheets.values.update({
             spreadsheetId,
             range: `'${title}'!A2:J2`,
