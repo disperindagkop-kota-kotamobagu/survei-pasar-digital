@@ -178,9 +178,20 @@ export async function POST(req: NextRequest) {
       ? `https://www.google.com/maps?q=${location_lat},${location_long}`
       : '-';
     
-    // Kolom I (ke-9) adalah ID Unik untuk pencegahan duplikat
+    // Kolom J (ke-10) adalah ID Unik untuk pencegahan duplikat
     const values = [
-      [fullDate, surveyor_name, market_name, body.location_type || 'Lapak', amount, finalPhotoLink, notes || '-', mapsLink, id]
+      [
+        fullDate, 
+        surveyor_name, 
+        market_name, 
+        body.location_type || 'Lapak', 
+        'Rp', 
+        amount, 
+        finalPhotoLink, 
+        notes || '-', 
+        mapsLink, 
+        id
+      ]
     ];
 
     // FITUR: Simpan Konfigurasi ke Sheets
@@ -237,7 +248,7 @@ export async function POST(req: NextRequest) {
           spreadsheetId,
           range,
           valueInputOption: 'USER_ENTERED',
-          requestBody: { values: [values[0]] },
+          requestBody: { values: values },
         });
       } catch (err: any) {
         const isMissingSheet = 
@@ -252,19 +263,19 @@ export async function POST(req: NextRequest) {
               requests: [{ addSheet: { properties: { title } } }]
             }
           });
-          // Add Header (8 Kolom)
+          // Add Header (10 Kolom)
           await sheets.spreadsheets.values.update({
             spreadsheetId,
-            range: `'${title}'!A1:H1`,
+            range: `'${title}'!A1:J1`,
             valueInputOption: 'USER_ENTERED',
-            requestBody: { values: [['Tanggal', 'Surveyor', 'Pasar', 'Tipe', 'Nominal', 'Foto (Drive)', 'Catatan', 'Lokasi (Maps)', 'ID Transaksi']] },
+            requestBody: { values: [['Tanggal (Waktu)', 'Surveyor', 'Pasar', 'Tipe', '#', 'Nominal', 'Foto (Drive)', 'Catatan/Keterangan', 'Lokasi (Maps)', 'ID Transaksi']] },
           });
           // Re-append
           await sheets.spreadsheets.values.append({
             spreadsheetId,
-            range: `'${title}'!A:I`,
+            range: `'${title}'!A:J`,
             valueInputOption: 'USER_ENTERED',
-            requestBody: { values: [values] },
+            requestBody: { values: values },
           });
         } else {
           throw err;
