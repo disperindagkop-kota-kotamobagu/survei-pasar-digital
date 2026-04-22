@@ -75,7 +75,8 @@ export default function SurveyPage() {
   // History & Edit
   const [history, setHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [editId, setEditId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<number | string | null>(null);
+  const [isEditingServer, setIsEditingServer] = useState(false);
   const [editingTempId, setEditingTempId] = useState<string | null>(null);
   const [modalMsg, setModalMsg] = useState<{ title: string; msg: string; type: 'success' | 'danger' | 'info' } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
@@ -139,6 +140,7 @@ export default function SurveyPage() {
     setLocationType('lapak');
     setNotes('');
     setEditId(null);
+    setIsEditingServer(false);
     setEditingTempId(null);
   };
 
@@ -148,10 +150,12 @@ export default function SurveyPage() {
       return;
     }
     setEditId(item.id);
-    setEditingTempId(item.tempId);
+    setIsEditingServer(!!item.fromServer);
+    setEditingTempId(item.tempId || null);
     setSelectedMarket(item.market_id);
     setAmount(item.amount.toString());
     setNotes(item.notes || '');
+    setLocationType(item.location_type || 'lapak');
     setPhotoPreview(item.photo_base64 || '');
     setGeofenceStatus(item.is_geofence_valid ? 'valid' : 'invalid');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -397,8 +401,24 @@ export default function SurveyPage() {
       };
 
       if (editId) {
-        await updatePendingSubmission(editId, payload);
-        setSaveResult({ type: 'success', msg: 'Data berhasil diperbarui! Sinkronisasi otomatis sedang berjalan.' });
+        if (isEditingServer) {
+          const res = await fetch(`/api/submissions/${editId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              market_id: selectedMarket,
+              amount: parseFloat(amount),
+              location_type: locationType,
+              notes,
+            })
+          });
+          const result = await res.json();
+          if (!result.success) throw new Error(result.error);
+          setSaveResult({ type: 'success', msg: 'Data di server berhasil diperbarui!' });
+        } else {
+          await updatePendingSubmission(editId as number, payload);
+          setSaveResult({ type: 'success', msg: 'Data berhasil diperbarui! Sinkronisasi otomatis sedang berjalan.' });
+        }
       } else {
         await addPendingSubmission(payload);
         setSaveResult({ type: 'success', msg: 'Data berhasil disimpan! Akan otomatis tersinkron saat online.' });
@@ -455,14 +475,19 @@ export default function SurveyPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {/* Step 1: Pilih Pasar */}
               <div className="card">
-                <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{
-                    width: 24, height: 24, borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 12, fontWeight: 800, color: 'white', flexShrink: 0
-                  }}>1</span>
-                  Pilih Pasar
+                  {editId ? (
+                    <span style={{ color: 'var(--warning)', textTransform: 'uppercase' }}>MODE EDIT</span>
+                  ) : (
+                    <>
+                      <span style={{
+                        width: 24, height: 24, borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 12, fontWeight: 800, color: 'white', flexShrink: 0
+                      }}>1</span>
+                      Pilih Pasar
+                    </>
+                  )}
                 </h3>
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <select
@@ -574,16 +599,29 @@ export default function SurveyPage() {
               </div>
 
               {/* Submit */}
-              <button
-                type="submit"
-                className="btn btn-primary btn-full btn-lg"
-                disabled={!canSubmit || saving || !!(geofenceStatus === 'invalid')}
-              >
-                {saving
-                  ? <><span className="spinner" /> Menyimpan...</>
-                  : <><SaveIcon /> Simpan Data Survei</>
-                }
-              </button>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-full btn-lg"
+                  disabled={!canSubmit || saving || !!(geofenceStatus === 'invalid')}
+                  style={{ flex: 2 }}
+                >
+                  {saving
+                    ? <><span className="spinner" /> {editId ? 'Memperbarui...' : 'Menyimpan...'}</>
+                    : <>{editId ? <><Check /> Perbarui Data</> : <><SaveIcon /> Simpan Data Survei</>}</>
+                  }
+                </button>
+                {editId && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-lg"
+                    style={{ flex: 1, color: 'var(--text-muted)' }}
+                    onClick={clearForm}
+                  >
+                    <X size={18} /> Batal
+                  </button>
+                )}
+              </div>
               {geofenceStatus === 'invalid' && (
                 <p className="text-sm text-danger text-center">Anda harus berada dalam radius 1km dari pasar untuk submit.</p>
               )}

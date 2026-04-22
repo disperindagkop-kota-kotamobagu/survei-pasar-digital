@@ -49,3 +49,44 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await req.json();
+
+  try {
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Filter only allowed fields to update
+    const updateData: any = {};
+    if (body.market_id) updateData.market_id = body.market_id;
+    if (body.amount !== undefined) updateData.amount = body.amount;
+    if (body.location_type) updateData.location_type = body.location_type;
+    if (body.notes !== undefined) updateData.notes = body.notes;
+    updateData.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabaseAdmin
+      .from('submissions')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Submission updated successfully',
+      data 
+    });
+  } catch (error: any) {
+    console.error('Update API Error:', error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
