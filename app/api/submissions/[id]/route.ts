@@ -3,9 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = params.id;
+  const { id } = await params;
 
   try {
     const supabaseAdmin = createClient(
