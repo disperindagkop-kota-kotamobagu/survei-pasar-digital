@@ -91,11 +91,7 @@ export default function AdminPage() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('placeholder')) {
-          console.error('Fetch error:', error);
-        }
-        setSubmissions(DEMO_SUBMISSIONS);
-        if (!mData) setMarkets(DEMO_MARKETS);
+        console.error('Fetch error:', error);
       } else {
         const transformed: Submission[] = data.map((s: any) => ({
           ...s,
@@ -105,8 +101,7 @@ export default function AdminPage() {
         setSubmissions(transformed);
       }
     } catch (e) {
-      setSubmissions(DEMO_SUBMISSIONS);
-      setMarkets(DEMO_MARKETS);
+      console.error('Fetch Data Exception:', e);
     }
     setLoading(false);
   };

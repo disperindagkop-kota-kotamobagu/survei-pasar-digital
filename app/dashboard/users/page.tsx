@@ -80,21 +80,27 @@ export default function UsersPage() {
     if (!editingUser) return;
     setProcessing(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          role: formData.role,
-          full_name: formData.full_name 
+      const res = await fetch('/api/admin/update-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingUser.id,
+          email: formData.email,
+          password: formData.password || undefined,
+          full_name: formData.full_name,
+          role: formData.role
         })
-        .eq('id', editingUser.id);
-        
-      if (error) throw error;
+      });
       
-      showToast('success', 'User berhasil diperbarui.');
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Gagal update user');
+      
+      showToast('success', 'Data user berhasil diperbarui.');
       setIsEditModalOpen(false);
+      setFormData({ email: '', password: '', full_name: '', role: 'surveyor' });
       fetchUsers();
     } catch (err: any) {
-      showToast('danger', 'Gagal update user: ' + err.message);
+      showToast('danger', err.message);
     } finally {
       setProcessing(false);
     }
@@ -125,7 +131,8 @@ export default function UsersPage() {
   const openEditModal = (user: Profile) => {
     setEditingUser(user);
     setFormData({ 
-      ...formData, 
+      email: '', // Email not in profile, can be left blank if not changing
+      password: '',
       role: user.role,
       full_name: user.full_name || ''
     });
@@ -306,6 +313,26 @@ export default function UsersPage() {
                     type="text" className="form-input" required 
                     value={formData.full_name} 
                     onChange={e => setFormData({...formData, full_name: e.target.value})}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Email Baru (Opsional)</label>
+                  <input 
+                    type="email" className="form-input"
+                    placeholder="Biarkan kosong jika tidak diubah"
+                    value={formData.email} 
+                    onChange={e => setFormData({...formData, email: e.target.value})}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Password Baru (Opsional)</label>
+                  <input 
+                    type="password" className="form-input"
+                    placeholder="Min. 6 karakter"
+                    value={formData.password} 
+                    onChange={e => setFormData({...formData, password: e.target.value})}
                   />
                 </div>
 
