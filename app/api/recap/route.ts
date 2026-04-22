@@ -4,7 +4,7 @@ import { google } from 'googleapis';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, amount, notes, market_name, surveyor_name, photo_base64, photo_url, created_at } = body;
+    const { id, amount, notes, market_name, surveyor_name, photo_base64, photo_url, created_at, location_lat, location_long } = body;
 
     // 1. Setup Google Auth & Validate Key (Added robust sanitization for Vercel/Env quotes)
     let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
