@@ -299,7 +299,7 @@ export default function AdminPage() {
         </div>
 
         {/* Total Revenue Card */}
-        <div className="card mb-6" style={{
+        <div className="card mb-8 mt-8" style={{
           background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(6,182,212,0.1))',
           border: '1px solid rgba(16,185,129,0.3)'
         }}>
