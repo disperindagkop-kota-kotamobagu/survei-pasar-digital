@@ -709,7 +709,7 @@ tbody tr:hover { background: rgba(99,102,241,0.04); }
   transition: var(--transition);
   padding-right: 6px; /* Offset ikon agar di tengah area lingkaran */
 }
- booking. mobile-menu-btn:hover {
+.mobile-menu-btn:hover {
   width: 54px;
   box-shadow: 6px 0 20px rgba(99, 102, 241, 0.4);
 }
