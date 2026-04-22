@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
             .remove([fullPath]);
 
           if (deleteError) {
-            console.error(`Gagal hapus file ${fileName}:`, deleteError.message);
+            console.error(`Gagal hapus file ${fullPath}:`, deleteError.message);
             errors.push(`${sub.id}: ${deleteError.message}`);
           } else {
             // Update database agar photo_url dikosongkan (atau ditandai sudah dihapus)
