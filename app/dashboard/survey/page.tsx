@@ -1,7 +1,6 @@
 'use client';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAuth } from '@/lib/authContext';
-import { DEMO_MARKETS } from '@/lib/mockData';
 import { haversineDistance, getUserLocation } from '@/lib/geofence';
 import { compressImage, blobToBase64, formatFileSize } from '@/lib/imageCompressor';
 import { addPendingSubmission } from '@/lib/dexieDb';

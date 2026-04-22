@@ -25,7 +25,6 @@ import {
   Clock3,
   ExternalLink
 } from 'lucide-react';
-import { DEMO_SUBMISSIONS, DEMO_MARKETS } from '@/lib/mockData';
 import { Submission } from '@/lib/supabaseClient';
 import ModernModal from '@/components/ModernModal';
 

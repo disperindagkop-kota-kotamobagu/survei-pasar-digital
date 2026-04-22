@@ -2,7 +2,6 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Profile, Role } from './supabaseClient';
-import { DEMO_ACCOUNTS } from './mockData';
 
 interface AuthContextType {
   user: Profile | null;
@@ -19,7 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => ({}),
   logout: () => {},
   updateProfile: async () => ({}),
-  isDemo: true,
+  isDemo: false,
 });
 
 const SESSION_KEY = 'ktg_survey_session';
@@ -38,16 +37,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    // Demo mode
-    const found = DEMO_ACCOUNTS.find(
-      a => a.email.toLowerCase() === email.toLowerCase() && a.password === password
-    );
-    if (found) {
-      setUser(found.user);
-      localStorage.setItem(SESSION_KEY, JSON.stringify(found.user));
-      return {};
-    }
-
     // Try real Supabase if configured
     if (
       process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -133,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateProfile, isDemo: true }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateProfile, isDemo: false }}>
       {children}
     </AuthContext.Provider>
   );
