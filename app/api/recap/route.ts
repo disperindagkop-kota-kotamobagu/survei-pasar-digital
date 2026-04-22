@@ -111,18 +111,26 @@ export async function POST(req: NextRequest) {
         // Gunakan proxyUrl terdeteksi (body -> Sheets Config -> Env)
         const proxyUrl = finalProxyUrl;
 
-        if (proxyUrl && (photo_base64 || photo_url)) {
-          // JALUR PROXY (Bypass Kuota 0GB)
-          let finalBase64 = photo_base64;
-          
-          if (!finalBase64 && photo_url) {
-            // Konversi URL ke Base64 agar Proxy bisa memprosesnya
+        if (!proxyUrl) {
+          throw new Error('Konfigurasi URL Proxy tidak ditemukan. Silakan klik tombol Simpan (Ikon Disket) di Dashboard.');
+        }
+
+        // JALUR PROXY (Wajib untuk Akun Personal)
+        let finalBase64 = photo_base64;
+        
+        if (!finalBase64 && photo_url) {
+          // Konversi URL ke Base64 agar Proxy bisa memprosesnya
+          try {
             const resp = await fetch(photo_url);
-            if (!resp.ok) throw new Error(`Gagal mendownload foto dari Supabase (HTTP ${resp.status})`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const arrayBuffer = await resp.arrayBuffer();
             finalBase64 = Buffer.from(arrayBuffer).toString('base64');
+          } catch (fetchErr: any) {
+            throw new Error(`Gagal download dari Supabase: ${fetchErr.message}. Pastikan Foto ada di Bucket.`);
           }
+        }
 
+        if (finalBase64) {
           const proxyRes = await fetch(proxyUrl, {
             method: 'POST',
             body: JSON.stringify({
@@ -131,43 +139,26 @@ export async function POST(req: NextRequest) {
               fileName: fileName
             })
           });
+          
+          if (!proxyRes.ok) throw new Error(`Proxy melapor error HTTP ${proxyRes.status}`);
+          
           const proxyData = await proxyRes.json();
           if (proxyData.success) {
             finalPhotoLink = proxyData.webViewLink;
           } else {
-            throw new Error(`Proxy Error: ${proxyData.error}`);
+            throw new Error(`Proxy Gagal: ${proxyData.error}`);
           }
         } else {
-          // JALUR STANDAR (Service Account - Akan gagal jika file besar & akun personal)
-          let media = {};
-          if (photo_base64) {
-            const buffer = Buffer.from(photo_base64, 'base64');
-            media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(buffer) };
-          } else if (photo_url) {
-            const response = await fetch(photo_url);
-            if (!response.ok) {
-              throw new Error(`Gagal mengambil foto dari Supabase URL (HTTP ${response.status}). Pastikan Bucket Publik.`);
-            }
-            const arrayBuffer = await response.arrayBuffer();
-            media = { mimeType: 'image/jpeg', body: require('stream').Readable.from(Buffer.from(arrayBuffer)) };
-          }
-
-          const driveResponse = await drive.files.create({
-            requestBody: { name: fileName, parents: [dateFolderId] },
-            media: media,
-            fields: 'id, webViewLink',
-          });
-
-          if (driveResponse.data.id) {
-            await drive.permissions.create({
-              fileId: driveResponse.data.id,
-              requestBody: { role: 'reader', type: 'anyone' },
-            });
-            finalPhotoLink = driveResponse.data.webViewLink || '-';
-          }
+          throw new Error('Data foto (Base64/URL) tidak ditemukan dalam request.');
         }
       } catch (uploadErr: any) {
-        return NextResponse.json({ success: false, error: `Gagal upload ke Drive: ${uploadErr.message}`, phase: 'DRIVE_UPLOAD', serviceEmail }, { status: 500 });
+        // Robot Jujur: Jika foto gagal, sampaikan SEBAGAI ERROR
+        return NextResponse.json({ 
+          success: false, 
+          error: `Gagal kirim foto ke Drive: ${uploadErr.message}`, 
+          phase: 'DRIVE_UPLOAD', 
+          serviceEmail 
+        }, { status: 500 });
       }
     }
 
