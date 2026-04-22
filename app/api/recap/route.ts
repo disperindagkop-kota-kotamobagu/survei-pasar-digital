@@ -235,16 +235,32 @@ export async function POST(req: NextRequest) {
             range: `'${title}'!H:H`,
           });
           const existingIds = (checkRes.data.values || []).map(row => row[0]);
-          if (existingIds.includes(id)) {
-            console.log(`[SKIP] Data ${id} sudah ada di tab ${title}`);
-            return;
+        // 1. Ambil data saat ini untuk mencari baris kosong pertama
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `'${title}'!A1:A100`, // Cek 100 baris pertama
+        });
+        
+        let nextRow = 2; // Mulai dari baris 2 (di bawah header)
+        if (response.data.values) {
+          // Cari baris pertama yang kolom A-nya kosong
+          const rows = response.data.values;
+          for (let i = 1; i < rows.length; i++) {
+            if (!rows[i][0]) {
+              nextRow = i + 1;
+              break;
+            }
+            if (i === rows.length - 1) nextRow = rows.length + 1;
           }
-        } catch (e) {
-          // Abaikan error jika range tidak ditemukan (berarti tab baru)
+          // Jika penuh sampai baris 100, lanjut ke baris berikutnya
+          if (nextRow === 2 && rows.length > 1 && rows[1][0]) {
+            nextRow = rows.length + 1;
+          }
         }
 
-        // 2. Tambah Data (Append)
-        await sheets.spreadsheets.values.append({
+        // 2. Tulis data ke baris spesifik tersebut agar masuk ke dalam Tabel
+        const range = `'${title}'!A${nextRow}:J${nextRow}`;
+        await sheets.spreadsheets.values.update({
           spreadsheetId,
           range,
           valueInputOption: 'USER_ENTERED',
@@ -253,9 +269,10 @@ export async function POST(req: NextRequest) {
       } catch (err: any) {
         const isMissingSheet = 
           err.message.includes('not found') || 
-          err.message.includes('Unable to parse range');
+          err.message.includes('Unable to parse range') ||
+          err.message.includes('Requested entity was not found');
           
-        if (isMissingSheet && !err.message.includes('Requested entity was not found')) {
+        if (isMissingSheet) {
           // Create Sheet
           await sheets.spreadsheets.batchUpdate({
             spreadsheetId,
@@ -263,17 +280,17 @@ export async function POST(req: NextRequest) {
               requests: [{ addSheet: { properties: { title } } }]
             }
           });
-          // Add Header (10 Kolom)
+          // Add Header (10 Kolom) - Mengikuti screenshot user
           await sheets.spreadsheets.values.update({
             spreadsheetId,
             range: `'${title}'!A1:J1`,
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: [['Tanggal (Waktu)', 'Surveyor', 'Pasar', 'Tipe', '#', 'Nominal', 'Foto (Drive)', 'Catatan/Keterangan', 'Lokasi (Maps)', 'ID Transaksi']] },
           });
-          // Re-append
-          await sheets.spreadsheets.values.append({
+          // Tulis data ke baris ke-2
+          await sheets.spreadsheets.values.update({
             spreadsheetId,
-            range: `'${title}'!A:J`,
+            range: `'${title}'!A2:J2`,
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: values },
           });
