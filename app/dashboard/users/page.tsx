@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase, Profile, Role } from '@/lib/supabaseClient';
-import { UserPlus, Search, UserCheck, Shield, ClipboardList, MoreVertical, Trash2, Edit2, X, Check } from 'lucide-react';
+import { UserPlus, Search, UserCheck, Shield, ClipboardList, MoreVertical, Trash2, Edit2, X, Check, AlertCircle } from 'lucide-react';
+import ModernModal from '@/components/ModernModal';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<Profile[]>([]);
@@ -23,6 +24,7 @@ export default function UsersPage() {
   });
 
   const [toast, setToast] = useState<{ type: 'success' | 'danger'; msg: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -106,8 +108,14 @@ export default function UsersPage() {
     }
   };
 
-  const handleDeleteUser = async (id: string, name: string) => {
-    if (!confirm(`Hapus user ${name} secara permanen? Akun auth juga akan dihapus.`)) return;
+  const handleDeleteUser = (id: string, name: string) => {
+    setDeleteTarget({ id, name });
+  };
+
+  const executeDeleteUser = async () => {
+    if (!deleteTarget) return;
+    const { id } = deleteTarget;
+    setDeleteTarget(null);
     setProcessing(true);
     try {
       const res = await fetch('/api/admin/delete-user', {
@@ -358,6 +366,18 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+
+      {/* Delete User Modal */}
+      <ModernModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Hapus Pengguna?"
+        description={`Apakah Anda yakin ingin menghapus user "${deleteTarget?.name}" secara permanen? Akun autentikasi dan seluruh data profil mereka akan dihapus.`}
+        type="danger"
+        confirmText="Ya, Hapus User"
+        onConfirm={executeDeleteUser}
+        loading={processing}
+      />
 
       <style jsx>{`
         .user-grid {
