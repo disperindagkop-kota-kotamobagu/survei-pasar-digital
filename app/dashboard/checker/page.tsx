@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { Submission } from '@/lib/supabaseClient';
-import { Check, X, Camera, MapPin, Scan, Filter, Zap, Clock, Info } from 'lucide-react';
+import { Check, X, Camera, MapPin, Scan, Filter, Zap, Clock, Info, Square, CheckSquare, Loader2 } from 'lucide-react';
 import ModernModal from '@/components/ModernModal';
 
 export default function CheckerPage() {
@@ -13,6 +13,8 @@ export default function CheckerPage() {
   const [toast, setToast] = useState<{ type: 'success' | 'danger'; msg: string } | null>(null);
   const [showAutoApproveConfirm, setShowAutoApproveConfirm] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkProcessing, setBulkProcessing] = useState(false);
 
   useEffect(() => {
     fetchSubmissions();
@@ -100,30 +102,93 @@ export default function CheckerPage() {
     setProcessing('auto');
     let successCount = 0;
     
-    for (const sub of qualifying) {
-      try {
-        const { supabase } = await import('@/lib/supabaseClient');
-        const { error } = await supabase
-          .from('submissions')
-          .update({ status: 'approved' })
-          .eq('id', sub.id);
-        
-        if (!error) {
-          await fetch('/api/recap', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...sub, proxyUrl }),
-          });
-          successCount++;
+    // Batch processing (3 items at a time) to speed up while keeping API safe
+    const batchSize = 3;
+    for (let i = 0; i < qualifying.length; i += batchSize) {
+      const batch = qualifying.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (sub) => {
+        try {
+          const { supabase } = await import('@/lib/supabaseClient');
+          const { error } = await supabase
+            .from('submissions')
+            .update({ status: 'approved' })
+            .eq('id', sub.id);
+          
+          if (!error) {
+            await fetch('/api/recap', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...sub, proxyUrl }),
+            });
+            successCount++;
+          }
+        } catch (e) {
+          console.error('Auto-approve error for ID:', sub.id, e);
         }
-      } catch (e) {
-        console.error('Auto-approve error:', e);
-      }
+      }));
     }
 
     showToast('success', `${successCount} data berhasil disetujui otomatis.`);
     fetchSubmissions();
     setProcessing(null);
+  };
+
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const toggleSelectAll = (filteredItems: Submission[]) => {
+    if (selectedIds.size === filteredItems.length && filteredItems.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredItems.map(s => s.id)));
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    const idsToApprove = Array.from(selectedIds);
+    if (idsToApprove.length === 0) return;
+    
+    setBulkProcessing(true);
+    setProcessing('bulk');
+    let successCount = 0;
+    
+    const batchSize = 3;
+    for (let i = 0; i < idsToApprove.length; i += batchSize) {
+      const batchIds = idsToApprove.slice(i, i + batchSize);
+      await Promise.all(batchIds.map(async (id) => {
+        const sub = submissions.find(s => s.id === id);
+        if (sub && sub.status === 'pending') {
+          try {
+            const { supabase } = await import('@/lib/supabaseClient');
+            const { error } = await supabase
+              .from('submissions')
+              .update({ status: 'approved' })
+              .eq('id', id);
+            
+            if (!error) {
+              await fetch('/api/recap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...sub, proxyUrl }),
+              });
+              successCount++;
+            }
+          } catch (e) {
+            console.error(`Error processing bulk ID ${id}:`, e);
+          }
+        }
+      }));
+    }
+    
+    showToast('success', `${successCount} data terpilih berhasil disetujui & diarsip.`);
+    setSelectedIds(new Set());
+    fetchSubmissions();
+    setProcessing(null);
+    setBulkProcessing(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -235,6 +300,32 @@ export default function CheckerPage() {
             </button>
           ))}
         </div>
+
+        {/* Bulk Action Bar - Shows when items are selected */}
+        {selectedIds.size > 0 && (
+          <div className="bulk-action-bar">
+            <div className="bulk-info">
+              <button className="btn-checkbox" onClick={() => toggleSelectAll(filtered)}>
+                <CheckSquare size={20} color="var(--primary)" />
+              </button>
+              <span><strong>{selectedIds.size}</strong> Data Terpilih</span>
+            </div>
+            <div className="bulk-btns">
+              <button 
+                className="btn btn-primary btn-sm" 
+                onClick={handleBulkApprove}
+                disabled={!!processing}
+                style={{ padding: '8px 20px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 8 }}
+              >
+                {bulkProcessing ? <Loader2 size={16} className="spinner-mini" /> : <Zap size={16} fill="white" />}
+                Approve & Arsip Massal
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setSelectedIds(new Set())} disabled={!!processing}>
+                Batal
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {toast && (
@@ -280,7 +371,16 @@ export default function CheckerPage() {
         ) : (
           <div className="submission-list">
             {filtered.map(sub => (
-              <div key={sub.id} className="modern-card">
+              <div key={sub.id} className={`modern-card ${selectedIds.has(sub.id) ? 'selected' : ''}`}>
+                {/* Selection Checkbox */}
+                <div className="card-selection-area" onClick={() => toggleSelect(sub.id)}>
+                  {selectedIds.has(sub.id) ? (
+                    <CheckSquare size={24} color="var(--primary)" fill="rgba(99,102,241,0.1)" />
+                  ) : (
+                    <Square size={24} color="var(--border)" />
+                  )}
+                </div>
+                
                 <div className="card-photo-section">
                   {sub.photo_url ? (
                     <div className="photo-container" onClick={() => setSelectedPhoto(sub.photo_url)}>
@@ -423,6 +523,38 @@ export default function CheckerPage() {
           border-bottom: 2px solid var(--primary-light);
           box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         }
+
+        .bulk-action-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 24px;
+          background: var(--primary-light-alpha);
+          border-top: 1px solid rgba(99,102,241,0.2);
+          animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDown {
+          from { transform: translateY(-10px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .bulk-info {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-size: 14px;
+        }
+        .bulk-btns {
+          display: flex;
+          gap: 10px;
+        }
+        .btn-checkbox {
+          background: none;
+          border: none;
+          padding: 0;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+        }
         
         .pulse-container {
           display: flex;
@@ -501,12 +633,36 @@ export default function CheckerPage() {
           border: 1px solid var(--border);
           border-radius: 16px;
           overflow: hidden;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.2s;
           box-shadow: var(--shadow-sm);
+          position: relative;
+        }
+        .modern-card.selected {
+          border-color: var(--primary);
+          background: rgba(99,102,241,0.03);
+          box-shadow: 0 0 0 2px var(--primary-light-alpha);
         }
         .modern-card:hover {
           transform: translateY(-4px);
           box-shadow: var(--shadow-lg);
+        }
+
+        .card-selection-area {
+          padding: 0 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          background: rgba(0,0,0,0.02);
+          border-right: 1px solid var(--border);
+          transition: background 0.2s;
+        }
+        .card-selection-area:hover {
+          background: rgba(99,102,241,0.05);
+        }
+        .selected .card-selection-area {
+          background: rgba(99,102,241,0.08);
+          border-right-color: rgba(99,102,241,0.2);
         }
 
         .card-photo-section {
