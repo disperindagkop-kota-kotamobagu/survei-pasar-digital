@@ -186,7 +186,7 @@ export default function AdminPage() {
       const filename = `Survei_Pasar_KTG_${new Date().toISOString().slice(0, 10)}.xlsx`;
       writeFile(wb, filename);
     } catch (err) {
-      alert('Gagal export. Pastikan library xlsx terinstall.');
+      setResultModal({ title: 'Gagal Export', msg: 'Terjadi kesalahan saat mengekspor data. Pastikan library pendukung tersedia.', type: 'danger' });
     }
     setExporting(false);
   };
@@ -208,10 +208,10 @@ export default function AdminPage() {
       if (result.success) {
         fetchData();
       } else {
-        alert('Gagal menghapus: ' + result.error);
+        setResultModal({ title: 'Gagal Menghapus', msg: result.error || 'Terjadi kesalahan saat menghapus data.', type: 'danger' });
       }
     } catch (e) {
-      alert('Kesalahan koneksi saat menghapus.');
+      setResultModal({ title: 'Kesalahan Koneksi', msg: 'Gagal menghubungi server. Periksa koneksi internet Anda.', type: 'danger' });
     } finally {
       setCleaning(false);
     }
