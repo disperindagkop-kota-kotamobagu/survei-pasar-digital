@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase, Market } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/authContext';
-import { ShieldAlert, Info } from 'lucide-react';
+import { ShieldAlert, Info, Trash2 } from 'lucide-react';
+import ModernModal from '@/components/ModernModal';
 
 // Import MapPicker dynamically to avoid SSR errors
 const MapPicker = dynamic(() => import('@/components/MapPicker'), {
@@ -26,6 +27,7 @@ export default function MarketsPage() {
   });
 
   const [toast, setToast] = useState<{ type: 'success' | 'danger'; msg: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Market | null>(null);
   
   const isDemoUser = !!user?.id?.includes('demo');
 
@@ -145,8 +147,14 @@ export default function MarketsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus pasar ini?')) return;
+  const handleDelete = (market: Market) => {
+    setDeleteTarget(market);
+  };
+  
+  const executeDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    setDeleteTarget(null);
     setProcessing(true);
     try {
       const { error } = await supabase
@@ -258,7 +266,7 @@ export default function MarketsPage() {
                     <button 
                       className="btn btn-ghost btn-sm" 
                       style={{ color: 'var(--danger)', padding: '0 10px' }}
-                      onClick={() => handleDelete(market.id)}
+                      onClick={() => handleDelete(market)}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
                     </button>
@@ -363,6 +371,18 @@ export default function MarketsPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ModernModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Hapus Pasar?"
+        description={`Apakah Anda yakin ingin menghapus "${deleteTarget?.name}"? Seluruh data yang terkait dengan pasar ini mungkin tidak dapat diakses lagi.`}
+        type="danger"
+        confirmText="Ya, Hapus Pasar"
+        onConfirm={executeDelete}
+        loading={processing}
+      />
 
       <style jsx>{`
         .grid-2-map {
