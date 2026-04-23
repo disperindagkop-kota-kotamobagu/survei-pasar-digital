@@ -56,6 +56,7 @@ export default function SurveyPage() {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const workerRef = useRef<any>(null);
 
   // Form
   const [amount, setAmount] = useState('');
@@ -63,6 +64,7 @@ export default function SurveyPage() {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
+  const [torchActive, setTorchActive] = useState(false);
   
   // Real-time Sync Modal State
   const [syncModal, setSyncModal] = useState<{ 
@@ -246,7 +248,23 @@ export default function SurveyPage() {
     cameraStream?.getTracks().forEach(t => t.stop());
     setCameraStream(null);
     setCameraActive(false);
+    setTorchActive(false);
   }, [cameraStream]);
+
+  const toggleTorch = useCallback(async () => {
+    if (!cameraStream) return;
+    const track = cameraStream.getVideoTracks()[0];
+    const capabilities = track.getCapabilities() as any;
+    if (capabilities.torch) {
+      const next = !torchActive;
+      await track.applyConstraints({
+        advanced: [{ torch: next }]
+      } as any);
+      setTorchActive(next);
+    } else {
+      setModalMsg({ title: 'Fitur Tidak Didukung', msg: 'Perangkat Anda tidak mendukung fitur senter (flashlight) dari browser.', type: 'info' });
+    }
+  }, [cameraStream, torchActive]);
 
   const capturePhoto = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -296,18 +314,40 @@ export default function SurveyPage() {
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d')!;
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
+        
+        // Use a reasonable size for OCR (not too big, not too small)
+        const scale = Math.min(1, 1500 / Math.max(img.width, img.height));
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
+        
+        // Contrast enhancement factor
+        const contrast = 1.5; // Increase contrast by 50%
+        const intercept = 128 * (1 - contrast);
+
         for (let i = 0; i < data.length; i += 4) {
-          const gray = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
-          data[i] = data[i + 1] = data[i + 2] = gray;
+          // Standard grayscale conversion
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+          
+          // Apply contrast
+          gray = contrast * gray + intercept;
+          
+          // Apply binary threshold (black text on white background)
+          // Most receipts are light paper with dark ink
+          const binary = gray > 140 ? 255 : 0;
+          
+          data[i] = data[i + 1] = data[i + 2] = binary;
         }
+        
         ctx.putImageData(imageData, 0, 0);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
       };
       img.src = dataUrl;
     });
@@ -323,21 +363,27 @@ export default function SurveyPage() {
       const processedUrl = await preprocessImage(imageUrl);
 
       const { createWorker } = await import('tesseract.js');
-      const worker = await createWorker('ind', 1, {
-        logger: (m: any) => {
-          if (m.status === 'recognizing text') {
-            setOcrProgress(Math.round(m.progress * 100));
-          }
-        },
-      });
+      
+      // Use cached worker or create new one
+      if (!workerRef.current) {
+        const worker = await createWorker('ind', 1, {
+          logger: (m: any) => {
+            if (m.status === 'recognizing text') {
+              setOcrProgress(Math.round(m.progress * 100));
+            }
+          },
+        });
 
-      // Optimasi untuk angka
-      await worker.setParameters({
-        tessedit_char_whitelist: '0123456789.,Rp ',
-      });
+        // Optimization for numbers and currency symbols
+        await worker.setParameters({
+          tessedit_char_whitelist: '0123456789.,Rp \n',
+          tessjs_create_hocr: '0',
+          tessjs_create_tsv: '0',
+        });
+        workerRef.current = worker;
+      }
 
-      const { data: { text } } = await worker.recognize(processedUrl);
-      await worker.terminate();
+      const { data: { text } } = await workerRef.current.recognize(processedUrl);
       setOcrText(text.trim());
 
       // Extract numbers from OCR text
@@ -350,23 +396,60 @@ export default function SurveyPage() {
     } catch (err) {
       console.error('OCR Error:', err);
       setOcrStatus('error');
+      // Clean up worker on error to be safe
+      if (workerRef.current) {
+        await workerRef.current.terminate();
+        workerRef.current = null;
+      }
     }
   }, []);
 
   // Extract amount from OCR text
   function extractAmount(text: string): string {
-    // Cari pola angka besar (nominal uang) — pisahkan titik/koma
-    const cleaned = text.replace(/[^\d.,\n]/g, ' ');
-    const matches = cleaned.match(/\d[\d.,]{2,}/g) || [];
-    // Ambil angka terbesar sebagai nominal
+    // 1. Clean common noise but keep dots and commas
+    // Remove "Rp" and spaces between digits that might be misinterpreted
+    let cleaned = text.replace(/Rp/gi, '').replace(/\s/g, ' ');
+    
+    // 2. Look for large number patterns (minimum 4 digits for IDR context)
+    // Matches: 50.000, 50,000, 50000, 50.000,00
+    const matches = cleaned.match(/\d[\d.,]{2,}\d/g) || [];
+    
     let biggest = 0;
-    let biggestStr = '';
+    
     for (const m of matches) {
-      const num = parseFloat(m.replace(/\./g, '').replace(',', '.'));
-      if (num > biggest) { biggest = num; biggestStr = m; }
+      // Logic for IDR: 
+      // If there's a comma followed by exactly 2 digits at the end, it's likely cents.
+      // Otherwise, dots and commas are usually thousand separators.
+      let numStr = m;
+      if (m.match(/,\d{2}$/)) {
+        numStr = m.substring(0, m.length - 3).replace(/[.,]/g, '');
+      } else {
+        numStr = m.replace(/[.,]/g, '');
+      }
+      
+      const num = parseInt(numStr);
+      
+      // Filter out reasonable market amounts (usually between 1.000 and 10.000.000)
+      // And ignore things that look like years (2024, 2025, 2026) if they appear alone
+      if (!isNaN(num)) {
+        // Preference for "standard" banknote values if found
+        const isStandardBanknote = [1000, 2000, 5000, 10000, 20000, 50000, 100000].includes(num);
+        
+        if (isStandardBanknote) {
+          // If we find a standard banknote, and it's the biggest so far, keep it.
+          if (num > biggest) biggest = num;
+        } else if (num >= 1000 && num <= 5000000) {
+          // Ignore years (approx 1990-2040) unless it's clearly a nominal
+          const isYear = num >= 1990 && num <= 2040;
+          if (!isYear && num > biggest) {
+            biggest = num;
+          }
+        }
+      }
     }
-    if (biggest >= 1000) {
-      return Math.round(biggest).toString();
+    
+    if (biggest > 0) {
+      return biggest.toString();
     }
     return '';
   }
@@ -441,7 +524,10 @@ export default function SurveyPage() {
   };
 
   useEffect(() => {
-    return () => { if (cameraStream) cameraStream.getTracks().forEach(t => t.stop()); };
+    return () => { 
+      if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+      if (workerRef.current) workerRef.current.terminate();
+    };
   }, [cameraStream]);
 
   const market = markets.find(m => m.id === selectedMarket);
@@ -685,14 +771,47 @@ export default function SurveyPage() {
                       </div>
                     ) : (
                       <div className="camera-zone active">
-                        <video
-                          ref={videoRef}
-                          autoPlay
-                          playsInline
-                          muted
-                          className="camera-preview"
-                          style={{ width: '100%', borderRadius: 12 }}
-                        />
+                        <div style={{ position: 'relative', width: '100%', borderRadius: 12, overflow: 'hidden' }}>
+                          <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="camera-preview"
+                            style={{ width: '100%', display: 'block' }}
+                          />
+                          {/* Visual Guide Overlay */}
+                          <div style={{
+                            position: 'absolute', inset: 0,
+                            border: '2px dashed rgba(255,255,255,0.4)',
+                            margin: '40px 20px', borderRadius: 8,
+                            pointerEvents: 'none',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}>
+                            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+                              Posisikan Angka di Sini
+                            </div>
+                          </div>
+                          
+                          {/* Torch Button */}
+                          <button
+                            type="button"
+                            onClick={toggleTorch}
+                            style={{
+                              position: 'absolute', top: 12, right: 12,
+                              width: 40, height: 40, borderRadius: '50%',
+                              background: torchActive ? 'var(--warning)' : 'rgba(0,0,0,0.4)',
+                              backdropFilter: 'blur(8px)', border: 'none', color: 'white',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: 'pointer', zIndex: 10
+                            }}
+                          >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill={torchActive ? 'currentColor' : 'none'}/>
+                            </svg>
+                          </button>
+                        </div>
+
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                           <button
                             type="button"
